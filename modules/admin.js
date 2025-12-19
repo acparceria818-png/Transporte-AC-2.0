@@ -1,276 +1,415 @@
-// modules/admin.js
-import { 
-  getOnibusDisponiveis, 
-  getRotasDisponiveis,
-  addOnibus,
-  addRota,
-  deleteDoc,
-  doc,
-  collection,
-  getDocs
-} from '../firebase.js';
+// admin.js - Painel administrativo e gestão
+import { estadoApp } from './config.js';
+import {
+  monitorarRotas,
+  monitorarEmergencias,
+  monitorarFeedbacks,
+  monitorarAvisos,
+  getEscalas,
+  getEstatisticasDashboard,
+  registrarAviso,
+  updateAviso,
+  deleteAviso,
+  addEscala,
+  updateEscala,
+  deleteEscala,
+  resolverEmergencia,
+  resolverFeedback,
+  responderFeedback,
+  getRotasDinamicas,
+  getOnibusDinamicos
+} from './firebase.js';
+import { mostrarNotificacao, mostrarConfirmacao, mostrarInput, showLoading, hideLoading } from './ui.js';
 
-import { mostrarNotificacao, showLoading, hideLoading } from './ui.js';
-
-// Estado global
-export let estadoApp = window.estadoApp || {};
-
-export async function carregarDadosDinamicos() {
-  try {
-    showLoading('Carregando dados...');
+export function iniciarMonitoramentoAdmin() {
+  if (estadoApp.unsubscribeRotas) return;
+  
+  estadoApp.unsubscribeRotas = monitorarRotas((rotas) => {
+    const container = document.getElementById('adminRotasList');
+    const countElement = document.getElementById('rotasAtivasCount');
+    const motoristasAtivosElement = document.getElementById('motoristasAtivosCount');
     
-    // Carregar ônibus do Firestore
-    const onibusSnapshot = await getOnibusDisponiveis();
-    estadoApp.onibusDisponiveis = onibusSnapshot;
+    if (!container) return;
     
-    // Carregar rotas do Firestore
-    const rotasSnapshot = await getRotasDisponiveis();
-    estadoApp.rotasDisponiveis = rotasSnapshot;
+    const rotasAtivas = rotas.filter(r => r.ativo !== false && r.online !== false);
     
-    // Atualizar UI se necessário
-    if (document.getElementById('tela-selecao-onibus')) {
-      renderizarOnibus();
+    if (countElement) {
+      countElement.textContent = rotasAtivas.length;
     }
     
-    if (document.getElementById('routesContainer')) {
-      renderizarRotas();
+    if (motoristasAtivosElement) {
+      const motoristasUnicos = [...new Set(rotasAtivas.map(r => r.matricula))];
+      motoristasAtivosElement.textContent = motoristasUnicos.length;
     }
     
-    return { onibus: onibusSnapshot, rotas: rotasSnapshot };
-  } catch (error) {
-    console.error('Erro ao carregar dados:', error);
-    mostrarNotificacao('Erro', 'Não foi possível carregar os dados', 'error');
-    return { onibus: [], rotas: [] };
-  } finally {
-    hideLoading();
-  }
-}
-
-export function renderizarOnibus() {
-  const container = document.getElementById('onibusList');
-  if (!container || !estadoApp.onibusDisponiveis) return;
-  
-  container.innerHTML = estadoApp.onibusDisponiveis.map(onibus => `
-    <div class="onibus-card" onclick="selecionarOnibus('${onibus.id || onibus.placa}')">
-      <div class="onibus-icon">
-        <i class="fas fa-bus"></i>
-      </div>
-      <div class="onibus-info">
-        <h4>${onibus.placa}</h4>
-        <p><strong>TAG AC:</strong> ${onibus.tag_ac}</p>
-        <p><strong>TAG VALE:</strong> ${onibus.tag_vale}</p>
-        <small><i class="fas fa-paint-brush"></i> ${onibus.cor}</small>
-      </div>
-      <div class="onibus-select">
-        <i class="fas fa-chevron-right"></i>
-      </div>
-    </div>
-  `).join('');
-}
-
-export function renderizarRotas() {
-  const container = document.getElementById('routesContainer');
-  if (!container || !estadoApp.rotasDisponiveis) return;
-  
-  const motoristaLogado = !!estadoApp.motorista;
-  const onibusSelecionado = !!estadoApp.onibusAtivo;
-  
-  container.innerHTML = estadoApp.rotasDisponiveis.map(rota => `
-    <div class="route-item ${rota.tipo}" data-tipo="${rota.tipo}">
-      <div class="route-info">
-        <div class="route-header">
-          <span class="route-icon">${rota.tipo === 'adm' ? '🏢' : rota.tipo === 'retorno' ? '🔄' : '🚛'}</span>
+    if (rotasAtivas.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🚛</div>
+          <h4>Nenhuma rota ativa</h4>
+          <p>Nenhum motorista está compartilhando localização no momento.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    container.innerHTML = rotasAtivas.map(rota => `
+      <div class="rota-admin-card ${rota.velocidade > 100 ? 'velocidade-alta' : ''}">
+        <div class="rota-admin-header">
           <div>
-            <div class="route-nome">${rota.nome}</div>
-            <small class="route-desc">${rota.desc}</small>
+            <strong>${rota.rota}</strong>
+            <span class="onibus-tag">${rota.onibus} (${rota.tag_ac})</span>
+          </div>
+          <span class="status-badge ${rota.velocidade > 100 ? 'alerta' : 'ativo'}">
+            ${rota.velocidade > 100 ? '⚡' : '✅'} ${rota.velocidade ? rota.velocidade + ' km/h' : 'Ativo'}
+          </span>
+        </div>
+        
+        <div class="rota-admin-info">
+          <div class="info-row">
+            <span>👤 Motorista:</span>
+            <span>${rota.motorista} (${rota.matricula})</span>
+          </div>
+          <div class="info-row">
+            <span>📍 Localização:</span>
+            <span>${rota.latitude?.toFixed(6)}, ${rota.longitude?.toFixed(6)}</span>
+          </div>
+          <div class="info-row">
+            <span>📏 Distância:</span>
+            <span>${rota.distancia || '0'} km rodados</span>
+          </div>
+          <div class="info-row">
+            <span>⏱️ Última atualização:</span>
+            <span>${rota.ultimaAtualizacao ? new Date(rota.ultimaAtualizacao.toDate()).toLocaleTimeString() : '--:--'}</span>
+          </div>
+          <div class="info-row">
+            <span>🎯 Precisão:</span>
+            <span>${rota.precisao ? rota.precisao.toFixed(0) + 'm' : '--'}</span>
           </div>
         </div>
-        <div class="route-status" id="status-${rota.id}">
-          <small>🔄 Verificando motoristas...</small>
-        </div>
-      </div>
-      <div class="route-actions">
-        ${motoristaLogado && onibusSelecionado ? `
-          <button class="btn" onclick="iniciarRota('${rota.nome}', '${rota.id}')">
-            ▶️ Iniciar Rota
+        
+        <div class="rota-admin-actions">
+          <button class="btn small" onclick="verMapaAdmin(${rota.latitude}, ${rota.longitude})">
+            🗺️ Ver Mapa
           </button>
-        ` : `
-          <button class="btn disabled" disabled title="Selecione um ônibus primeiro">
-            ⚠️ Selecione ônibus
+          <button class="btn small secondary" onclick="verDetalhesRota('${rota.matricula}')">
+            📊 Detalhes
           </button>
-        `}
-        <button class="btn secondary" onclick="abrirRotaNoMaps('${rota.id}')">
-          🗺️ Abrir Rota
-        </button>
-        <button class="btn outline" onclick="verMotoristasNaRota('${rota.nome}')">
-          👁️ Ver Motoristas
-        </button>
-      </div>
-    </div>
-  `).join('');
-}
-
-export async function adicionarNovoOnibus() {
-  const { value: formValues } = await Swal.fire({
-    title: 'Adicionar Novo Ônibus',
-    html: `
-      <input id="swal-placa" class="swal2-input" placeholder="Placa">
-      <input id="swal-tag_ac" class="swal2-input" placeholder="TAG AC">
-      <input id="swal-tag_vale" class="swal2-input" placeholder="TAG Vale">
-      <input id="swal-cor" class="swal2-input" placeholder="Cor">
-      <input id="swal-empresa" class="swal2-input" placeholder="Empresa">
-    `,
-    focusConfirm: false,
-    showCancelButton: true,
-    confirmButtonText: 'Salvar',
-    cancelButtonText: 'Cancelar',
-    preConfirm: () => {
-      return {
-        placa: document.getElementById('swal-placa').value,
-        tag_ac: document.getElementById('swal-tag_ac').value,
-        tag_vale: document.getElementById('swal-tag_vale').value,
-        cor: document.getElementById('swal-cor').value,
-        empresa: document.getElementById('swal-empresa').value
-      };
-    }
-  });
-
-  if (formValues) {
-    try {
-      await addOnibus(formValues);
-      await carregarDadosDinamicos();
-      mostrarNotificacao('Sucesso', 'Ônibus adicionado com sucesso!', 'success');
-    } catch (error) {
-      mostrarNotificacao('Erro', 'Não foi possível adicionar o ônibus', 'error');
-    }
-  }
-}
-
-export async function adicionarNovaRota() {
-  const { value: formValues } = await Swal.fire({
-    title: 'Adicionar Nova Rota',
-    html: `
-      <input id="swal-nome" class="swal2-input" placeholder="Nome da Rota">
-      <input id="swal-tipo" class="swal2-input" placeholder="Tipo (adm/operacional/retorno)">
-      <input id="swal-desc" class="swal2-input" placeholder="Descrição">
-      <input id="swal-mapsUrl" class="swal2-input" placeholder="URL do Google Maps">
-    `,
-    focusConfirm: false,
-    showCancelButton: true,
-    confirmButtonText: 'Salvar',
-    cancelButtonText: 'Cancelar',
-    preConfirm: () => {
-      return {
-        nome: document.getElementById('swal-nome').value,
-        tipo: document.getElementById('swal-tipo').value,
-        desc: document.getElementById('swal-desc').value,
-        mapsUrl: document.getElementById('swal-mapsUrl').value
-      };
-    }
-  });
-
-  if (formValues) {
-    try {
-      await addRota(formValues);
-      await carregarDadosDinamicos();
-      mostrarNotificacao('Sucesso', 'Rota adicionada com sucesso!', 'success');
-    } catch (error) {
-      mostrarNotificacao('Erro', 'Não foi possível adicionar a rota', 'error');
-    }
-  }
-}
-
-export function criarPainelAdminDinamico() {
-  const modalHTML = `
-    <div class="admin-crud-panel">
-      <div class="crud-section">
-        <h3><i class="fas fa-bus"></i> Gerenciar Frota</h3>
-        <button class="btn btn-primary" onclick="adicionarNovoOnibus()">
-          <i class="fas fa-plus"></i> Adicionar Ônibus
-        </button>
-        <div class="frota-list" id="adminFrotaList">
-          <!-- Lista de ônibus será carregada aqui -->
+          <button class="btn small warning" onclick="enviarNotificacaoMotorista('${rota.matricula}')">
+            📢 Notificar
+          </button>
         </div>
       </div>
-      
-      <div class="crud-section">
-        <h3><i class="fas fa-route"></i> Gerenciar Rotas</h3>
-        <button class="btn btn-primary" onclick="adicionarNovaRota()">
-          <i class="fas fa-plus"></i> Adicionar Rota
-        </button>
-        <div class="rotas-list" id="adminRotasList">
-          <!-- Lista de rotas será carregada aqui -->
+    `).join('');
+  });
+}
+
+export function iniciarMonitoramentoEmergencias() {
+  if (estadoApp.unsubscribeEmergencias) return;
+  
+  estadoApp.unsubscribeEmergencias = monitorarEmergencias((emergencias) => {
+    const container = document.getElementById('emergenciasList');
+    const countElement = document.getElementById('emergenciasCount');
+    
+    if (!container) return;
+    
+    const emergenciasAtivas = emergencias.filter(e => e.status === 'pendente');
+    
+    if (countElement) {
+      countElement.textContent = emergenciasAtivas.length;
+    }
+    
+    if (emergenciasAtivas.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">✅</div>
+          <h4>Nenhuma emergência ativa</h4>
+          <p>Todas as situações estão sob controle.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    container.innerHTML = emergenciasAtivas.map(emergencia => `
+      <div class="emergencia-card">
+        <div class="emergencia-header">
+          <div class="emergencia-titulo">
+            <span class="emergencia-icon">🚨</span>
+            <strong>${emergencia.tipo}</strong>
+          </div>
+          <span class="tempo-decorrido">${calcularTempoDecorrido(emergencia.timestamp)}</span>
+        </div>
+        
+        <div class="emergencia-info">
+          <div class="info-row">
+            <span>👤 Motorista:</span>
+            <span>${emergencia.motorista} (${emergencia.matricula})</span>
+          </div>
+          <div class="info-row">
+            <span>🚌 Ônibus:</span>
+            <span>${emergencia.onibus}</span>
+          </div>
+          <div class="info-row">
+            <span>🗺️ Rota:</span>
+            <span>${emergencia.rota}</span>
+          </div>
+          <div class="info-row">
+            <span>📝 Descrição:</span>
+            <span>${emergencia.descricao}</span>
+          </div>
+        </div>
+        
+        <div class="emergencia-actions">
+          <button class="btn small success" onclick="resolverEmergenciaAdmin('${emergencia.id}')">
+            ✅ Resolver
+          </button>
+          <button class="btn small" onclick="contatarMotoristaAdmin('${emergencia.matricula}')">
+            📞 Contatar
+          </button>
+          <button class="btn small warning" onclick="verLocalizacaoEmergencia('${emergencia.id}')">
+            📍 Localização
+          </button>
         </div>
       </div>
-    </div>
-  `;
+    `).join('');
+  });
+}
 
-  Swal.fire({
-    title: 'Painel Administrativo',
-    html: modalHTML,
-    width: '800px',
-    showConfirmButton: false,
-    showCloseButton: true,
-    didOpen: () => {
-      carregarListaAdmin();
+export function iniciarMonitoramentoFeedbacks() {
+  if (estadoApp.unsubscribeFeedbacks) return;
+  
+  estadoApp.unsubscribeFeedbacks = monitorarFeedbacks((feedbacks) => {
+    const container = document.getElementById('feedbacksList');
+    const countElement = document.getElementById('feedbacksCount');
+    
+    if (!container) return;
+    
+    const feedbacksPendentes = feedbacks.filter(f => f.status === 'pendente');
+    
+    if (countElement) {
+      countElement.textContent = feedbacksPendentes.length;
+    }
+    
+    if (feedbacksPendentes.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">💭</div>
+          <h4>Nenhum feedback pendente</h4>
+          <p>Todos os feedbacks foram revisados.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    container.innerHTML = feedbacksPendentes.map(feedback => `
+      <div class="feedback-card">
+        <div class="feedback-header">
+          <div>
+            <span class="feedback-perfil">${feedback.perfil === 'motorista' ? '👤 Motorista' : '🧍 Passageiro'}</span>
+            <span class="feedback-tipo ${feedback.tipo}">${feedback.tipo}</span>
+          </div>
+          <span class="tempo-decorrido">${calcularTempoDecorrido(feedback.timestamp)}</span>
+        </div>
+        
+        <div class="feedback-mensagem">
+          <p>${feedback.mensagem}</p>
+        </div>
+        
+        ${feedback.motorista ? `
+        <div class="feedback-info">
+          <small>👤 ${feedback.motorista} ${feedback.matricula ? `(${feedback.matricula})` : ''}</small>
+        </div>
+        ` : ''}
+        
+        <div class="feedback-actions">
+          <button class="btn small success" onclick="resolverFeedbackAdmin('${feedback.id}')">
+            ✅ Resolver
+          </button>
+          <button class="btn small" onclick="responderFeedbackAdmin('${feedback.id}')">
+            💬 Responder
+          </button>
+        </div>
+      </div>
+    `).join('');
+  });
+}
+
+export function iniciarMonitoramentoAvisos() {
+  if (estadoApp.unsubscribeAvisos) return;
+  
+  estadoApp.unsubscribeAvisos = monitorarAvisos((avisos) => {
+    estadoApp.avisosAtivos = avisos;
+    
+    const avisosCount = document.getElementById('avisosCount');
+    if (avisosCount) {
+      avisosCount.textContent = avisos.length;
+      avisosCount.style.display = avisos.length > 0 ? 'inline' : 'none';
     }
   });
 }
 
-async function carregarListaAdmin() {
+// Gerenciamento de escalas
+export async function carregarEscalas() {
   try {
-    showSkeleton('adminFrotaList', 3);
-    showSkeleton('adminRotasList', 3);
-    
-    const dados = await carregarDadosDinamicos();
-    
-    // Renderizar frota
-    const frotaList = document.getElementById('adminFrotaList');
-    if (frotaList) {
-      frotaList.innerHTML = dados.onibus.map(onibus => `
-        <div class="admin-item">
-          <div class="admin-item-info">
-            <strong>${onibus.placa}</strong>
-            <small>${onibus.tag_ac} • ${onibus.cor}</small>
-          </div>
-          <div class="admin-item-actions">
-            <button class="btn btn-sm btn-warning" onclick="editarOnibus('${onibus.id}')">
-              <i class="fas fa-edit"></i>
-            </button>
-            <button class="btn btn-sm btn-danger" onclick="excluirOnibus('${onibus.id}')">
-              <i class="fas fa-trash"></i>
-            </button>
-          </div>
-        </div>
-      `).join('');
-    }
-    
-    // Renderizar rotas
-    const rotasList = document.getElementById('adminRotasList');
-    if (rotasList) {
-      rotasList.innerHTML = dados.rotas.map(rota => `
-        <div class="admin-item">
-          <div class="admin-item-info">
-            <strong>${rota.nome}</strong>
-            <small>${rota.tipo} • ${rota.desc}</small>
-          </div>
-          <div class="admin-item-actions">
-            <button class="btn btn-sm btn-warning" onclick="editarRota('${rota.id}')">
-              <i class="fas fa-edit"></i>
-            </button>
-            <button class="btn btn-sm btn-danger" onclick="excluirRota('${rota.id}')">
-              <i class="fas fa-trash"></i>
-            </button>
-          </div>
-        </div>
-      `).join('');
-    }
-  } catch (error) {
-    console.error('Erro ao carregar lista admin:', error);
+    const escalas = await getEscalas();
+    estadoApp.escalas = escalas;
+  } catch (erro) {
+    console.error('Erro ao carregar escalas:', erro);
   }
 }
 
-// Adicionar funções ao window
-window.adicionarNovoOnibus = adicionarNovoOnibus;
-window.adicionarNovaRota = adicionarNovaRota;
-window.criarPainelAdminDinamico = criarPainelAdminDinamico;
+export async function carregarEscalaMotorista(matricula) {
+  try {
+    console.log('Buscando escala para matrícula:', matricula);
+    
+    const escalas = await getEscalas();
+    console.log('Todas as escalas carregadas:', escalas);
+    
+    const escalaMotorista = escalas.find(escala => {
+      const match = escala.matricula && escala.matricula.toString() === matricula.toString();
+      if (match) {
+        console.log('Escala encontrada:', escala);
+      }
+      return match;
+    });
+    
+    if (escalaMotorista) {
+      console.log('Escala encontrada para matrícula:', matricula);
+      estadoApp.escalaMotorista = escalaMotorista;
+      atualizarTelaEscala(escalaMotorista);
+      
+      mostrarNotificacao('✅ Escala Carregada', 'Sua escala foi carregada com sucesso!');
+      
+      return escalaMotorista;
+    } else {
+      console.log('Nenhuma escala encontrada para matrícula:', matricula);
+      
+      const container = document.querySelector('.escala-dias');
+      if (container) {
+        container.innerHTML = `
+          <div class="empty-state" style="grid-column: 1 / -1;">
+            <i class="fas fa-calendar-times" style="font-size: 48px; color: #ff6b6b; margin-bottom: 16px;"></i>
+            <h4>Nenhuma escala encontrada</h4>
+            <p>Não foi encontrada uma escala para a matrícula <strong>${matricula}</strong>.</p>
+            <p>Entre em contato com a administração para cadastrar sua escala.</p>
+            <button class="btn btn-secondary" onclick="location.reload()">
+              <i class="fas fa-redo"></i> Tentar Novamente
+            </button>
+          </div>
+        `;
+      }
+      
+      mostrarNotificacao('⚠️ Escala não encontrada', `Matrícula ${matricula} não possui escala cadastrada.`);
+      
+      return null;
+    }
+  } catch (erro) {
+    console.error('Erro ao carregar escala do motorista:', erro);
+    
+    const container = document.querySelector('.escala-dias');
+    if (container) {
+      container.innerHTML = `
+        <div class="empty-state" style="grid-column: 1 / -1;">
+          <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #ff6b6b; margin-bottom: 16px;"></i>
+          <h4>Erro ao carregar escala</h4>
+          <p>Ocorreu um erro ao carregar sua escala. Tente novamente.</p>
+          <p><small>Erro: ${erro.message}</small></p>
+          <button class="btn btn-secondary" onclick="location.reload()">
+            <i class="fas fa-redo"></i> Tentar Novamente
+          </button>
+        </div>
+      `;
+    }
+    
+    mostrarNotificacao('❌ Erro', 'Não foi possível carregar sua escala. Tente novamente.');
+    
+    return null;
+  }
+}
+
+function atualizarTelaEscala(escala) {
+  const container = document.querySelector('.escala-dias');
+  if (!container) {
+    console.error('Container .escala-dias não encontrado');
+    return;
+  }
+  
+  if (!escala) {
+    console.error('Escala é undefined ou null');
+    container.innerHTML = `
+      <div class="empty-state" style="grid-column: 1 / -1;">
+        <i class="fas fa-exclamation-circle"></i>
+        <h4>Escala não disponível</h4>
+        <p>Dados da escala não puderam ser carregados.</p>
+      </div>
+    `;
+    return;
+  }
+
+  console.log('Atualizando tela com escala:', escala);
+  
+  const diasSemana = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+  
+  if (!escala.dias || !Array.isArray(escala.dias)) {
+    console.warn('Escala sem dias definidos ou estrutura inválida:', escala);
+    escala.dias = [];
+  }
+  
+  container.innerHTML = diasSemana.map(dia => {
+    const diaEscala = escala.dias.find(d => {
+      return d && d.dia && d.dia.trim().toLowerCase() === dia.toLowerCase();
+    });
+    
+    console.log(`Dia ${dia}:`, diaEscala);
+    
+    return `
+      <div class="dia-escala ${diaEscala ? '' : 'folga'}">
+        <div class="dia-nome">${dia}</div>
+        <div class="dia-info">
+          ${diaEscala ? `
+            <span class="turno ${getTurnoClass(diaEscala.horario)}">${diaEscala.horario || '00:00 - 00:00'}</span>
+            <span class="rota">${diaEscala.rota || 'Sem rota'}</span>
+            ${diaEscala.onibus ? `<small class="onibus-escala">${diaEscala.onibus}</small>` : ''}
+          ` : `
+            <span class="folga-text">FOLGA</span>
+          `}
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  const infoHeader = document.querySelector('.escala-info');
+  if (infoHeader && !infoHeader.querySelector('.escala-motorista-info')) {
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'escala-motorista-info';
+    infoDiv.innerHTML = `
+      <div style="margin-bottom: 10px;">
+        <strong>Motorista:</strong> ${escala.motorista || 'Não informado'}
+      </div>
+      <div style="margin-bottom: 10px;">
+        <strong>Matrícula:</strong> ${escala.matricula || 'Não informada'}
+      </div>
+      ${escala.periodo ? `
+        <div>
+          <strong>Período:</strong> ${escala.periodo}
+        </div>
+      ` : ''}
+    `;
+    infoHeader.appendChild(infoDiv);
+  }
+}
+
+function getTurnoClass(horario) {
+  if (!horario) return 'manha';
+  if (horario.includes('06:00')) return 'manha';
+  if (horario.includes('14:00')) return 'tarde';
+  if (horario.includes('22:00')) return 'noite';
+  return 'manha';
+}
+
+// Exportar funções para uso global
+window.gerenciarAvisos = gerenciarAvisos;
+window.gerenciarEscalas = gerenciarEscalas;
+window.resolverEmergenciaAdmin = resolverEmergenciaAdmin;
+window.resolverFeedbackAdmin = resolverFeedbackAdmin;
+window.responderFeedbackAdmin = responderFeedbackAdmin;
