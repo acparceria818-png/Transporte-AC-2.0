@@ -8,7 +8,7 @@ export const UI = {
     const r = await Swal.fire({ title, text, icon: 'question', showCancelButton: true, confirmButtonColor: '#b00000' });
     return r.isConfirmed;
   },
-  showLoading: (msg='Carregando...') => Swal.fire({ title: msg, didOpen: () => Swal.showLoading() }),
+  showLoading: (msg='Carregando...') => Swal.fire({ title: msg, allowOutsideClick: false, didOpen: () => Swal.showLoading() }),
   hideLoading: () => Swal.close(),
   mostrarTela: (id) => {
     document.querySelectorAll('.tela').forEach(t => t.classList.add('hidden'));
