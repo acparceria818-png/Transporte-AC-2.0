@@ -2,23 +2,22 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Portal de Transporte da AC Parceria e Terraplenagem">
   <meta name="theme-color" content="#b00000" />
   <title>AC Parceria - Portal de Transporte</title>
   
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.jpg" type="image/jpg">
-  <link rel="stylesheet" href="styles.css">
   
+  <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 
-  <script type="module" src="firebase.js"></script>
-  <script type="module" src="ui.js"></script>
-  <script type="module" src="maps.js"></script>
-  <script type="module" src="auth.js"></script>
   <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -30,196 +29,339 @@
 
 <header>
   <img src="Logo.jpg" alt="AC Logo" class="logo" loading="lazy" />
-  <h1>AC PARCERIA - Portal</h1>
+  <h1>AC PARCERIA E TERRAPLENAGEM — Portal de Transporte</h1>
   <div class="user-status" id="userStatus" style="display:none">
     <span id="userName"></span>
-    <button class="logout-btn" id="logoutBtn" title="Sair">
+    <button class="logout-btn" onclick="window.logout()" title="Sair">
       <i class="fas fa-sign-out-alt"></i>
     </button>
   </div>
 </header>
 
 <div class="top-actions container">
-  <div><button class="icon-btn" id="installBtn" style="display:none"><i class="fas fa-download"></i> App</button></div>
-  <div><button class="icon-btn" id="darkToggle"><i class="fas fa-moon"></i></button></div>
+  <div>
+    <button class="icon-btn" id="installBtn" style="display:none" aria-label="Instalar aplicativo">
+      <i class="fas fa-download"></i> Instalar
+    </button>
+  </div>
+  <div>
+    <button class="icon-btn" id="darkToggle" title="Alternar tema">
+      <i class="fas fa-moon"></i>
+    </button>
+    <span class="connection-status" id="connectionStatus" title="Status da conexão">
+      <i class="fas fa-circle"></i>
+    </span>
+  </div>
 </div>
 
 <main class="container">
-
   <section id="welcome" class="tela ativa">
     <div class="welcome-content">
-      <img src="avatar.png" class="avatar" alt="Avatar AC" />
+      <img src="avatar.png" class="avatar" alt="Avatar AC" loading="lazy" />
       <div class="welcome-text">
-        <h2><i class="fas fa-bus"></i> Portal de Transporte</h2>
-        <p>Rotas e monitoramento oficial.</p>
-        <button class="btn btn-primary btn-large" id="btnEntrarPortal"><i class="fas fa-sign-in-alt"></i> Entrar</button>
+        <h2><i class="fas fa-bus"></i> Bem-vindo ao Portal de Transporte</h2>
+        <p>Rotas, registro de entrada/saída e avisos oficiais da <strong>AC Parceria e Terraplenagem</strong>.</p>
+        <div class="alert-card">
+          <div class="alert-icon"><i class="fas fa-clock"></i></div>
+          <div class="alert-content"><strong>Importante:</strong> O formulário de controle de veículo deve ser preenchido <strong>2× ao dia</strong>.</div>
+        </div>
+        <button class="btn btn-primary btn-large" onclick="window.entrarNoPortal()">
+          <i class="fas fa-sign-in-alt"></i> Entrar no Portal
+        </button>
       </div>
     </div>
   </section>
 
   <section id="telaEscolhaPerfil" class="tela hidden">
-    <div class="section-header"><h2>Acesso</h2></div>
+    <div class="section-header">
+      <h2><i class="fas fa-user-circle"></i> Como você está acessando?</h2>
+    </div>
     <div class="cards-grid">
-      <div class="profile-card" id="cardMotorista">
+      <div class="profile-card" onclick="window.selecionarPerfil('motorista')">
         <div class="card-icon motorista"><i class="fas fa-bus"></i></div>
         <h3>Motorista</h3>
       </div>
-      <div class="profile-card" id="cardPassageiro">
+      <div class="profile-card" onclick="window.selecionarPerfil('passageiro')">
         <div class="card-icon passageiro"><i class="fas fa-users"></i></div>
         <h3>Passageiro</h3>
       </div>
-      <div class="profile-card" id="cardAdmin">
+      <div class="profile-card" onclick="window.selecionarPerfil('admin')">
         <div class="card-icon admin"><i class="fas fa-cogs"></i></div>
-        <h3>Admin</h3>
+        <h3>Administrador</h3>
       </div>
     </div>
-    <div class="action-footer"><button class="btn btn-secondary" id="btnVoltarWelcome">Voltar</button></div>
+    <div class="action-footer">
+      <button class="btn btn-secondary" onclick="window.mostrarTela('welcome')"><i class="fas fa-arrow-left"></i> Voltar</button>
+    </div>
   </section>
 
   <section id="tela-motorista-login" class="tela hidden">
-    <div class="section-header"><h2>Login Motorista</h2></div>
+    <div class="section-header"><h2><i class="fas fa-bus"></i> Login do Motorista</h2></div>
     <div class="auth-card">
+      <div class="auth-icon"><i class="fas fa-id-card"></i></div>
       <div class="form-group">
-        <label>Matrícula</label>
-        <input id="matriculaMotorista" type="text" class="form-input" placeholder="Ex: AC1234">
+        <label for="matriculaMotorista"><i class="fas fa-hashtag"></i> Matrícula</label>
+        <input id="matriculaMotorista" type="text" placeholder="Digite sua matrícula" class="form-input" maxlength="10">
       </div>
-      <button class="btn btn-primary btn-block" id="btnLoginMotorista">Entrar</button>
+      <button class="btn btn-primary btn-block" onclick="window.confirmarMatriculaMotorista()" id="loginBtn"><i class="fas fa-sign-in-alt"></i> Entrar</button>
     </div>
-    <div class="action-footer"><button class="btn btn-secondary" id="btnVoltarPerfil">Voltar</button></div>
+    <div class="action-footer">
+      <button class="btn btn-secondary" onclick="window.mostrarTela('telaEscolhaPerfil')"><i class="fas fa-arrow-left"></i> Voltar</button>
+    </div>
   </section>
 
   <section id="tela-selecao-onibus" class="tela hidden">
-    <div class="section-header"><h2>Selecione seu Ônibus</h2></div>
-    <div class="onibus-list" id="onibusList">
-      </div>
-    <div class="action-footer"><button class="btn btn-secondary" id="btnVoltarLoginMot">Voltar</button></div>
+    <div class="section-header"><h2><i class="fas fa-bus"></i> Selecione seu Ônibus</h2></div>
+    <div class="onibus-list" id="onibusList"></div>
+    <div class="action-footer">
+      <button class="btn btn-secondary" onclick="window.mostrarTela('tela-motorista-login')"><i class="fas fa-arrow-left"></i> Voltar</button>
+    </div>
   </section>
 
   <section id="tela-motorista" class="tela hidden">
     <div class="user-header">
       <div class="user-avatar"><i class="fas fa-user-circle"></i></div>
       <div class="user-info">
-        <h2>Olá, <span id="motoristaNomeDisplay"></span>!</h2>
+        <h2>Olá, <span id="motoristaNome"></span>!</h2>
         <div class="user-details">
-          <span class="user-badge"><i class="fas fa-bus"></i> <span id="motoristaOnibusDisplay"></span></span>
+          <span class="user-badge"><i class="fas fa-id-card"></i> <span id="motoristaMatricula"></span></span>
+          <span class="user-badge"><i class="fas fa-bus"></i> <span id="motoristaOnibus"></span></span>
         </div>
+        <div class="user-tags"></div>
       </div>
     </div>
-
-    <div class="status-card">
-      <div class="status-header"><i class="fas fa-route"></i> <h3>Status</h3></div>
+    <div class="status-card" id="rotaStatusCard">
+      <div class="status-header"><i class="fas fa-route"></i> <h3>Status da Rota</h3></div>
       <div class="status-content">
-        <p id="rotaStatusTexto">Nenhuma rota ativa</p>
-        <button class="btn btn-danger" id="btnPararRota" style="display:none"><i class="fas fa-stop"></i> Parar</button>
+        <p id="rotaStatus">Nenhuma rota ativa</p>
+        <button class="btn btn-danger" onclick="window.pararRota()" id="pararRotaBtn" style="display:none"><i class="fas fa-stop"></i> Parar Rota</button>
       </div>
     </div>
-
     <div class="cards-grid">
-      <div class="feature-card" id="btnIrParaRotas">
+      <div class="feature-card" onclick="window.mostrarTela('tela-rotas')">
         <div class="card-icon primary"><i class="fas fa-route"></i></div>
-        <h3>Iniciar Rota</h3>
+        <h3>Selecionar Rota</h3>
       </div>
-      <div class="feature-card warning" id="btnAvisos">
+      <div class="feature-card" onclick="window.mostrarAvisos()">
         <div class="card-icon warning"><i class="fas fa-bullhorn"></i></div>
-        <h3>Avisos</h3>
+        <h3>Avisos & Comunicados</h3>
+        <span class="badge" id="avisosCount" style="display:none">0</span>
       </div>
-      <div class="feature-card info" onclick="window.open('https://forms.gle/UDniKxPqcMKGUhFQA', '_blank')">
+      <div class="feature-card" onclick="window.verFormsControle()">
         <div class="card-icon info"><i class="fas fa-clipboard-check"></i></div>
-        <h3>Controle Veículo</h3>
+        <h3>Controle de Veículo</h3>
       </div>
-      <div class="feature-card secondary" id="btnFeedbackMot">
+      <div class="feature-card" onclick="window.abrirFeedback('motorista')">
         <div class="card-icon secondary"><i class="fas fa-comment-dots"></i></div>
         <h3>Feedback</h3>
       </div>
-      <div class="feature-card emergency" id="btnEmergencia">
-        <div class="card-icon danger"><i class="fas fa-exclamation-triangle"></i></div>
-        <h3>EMERGÊNCIA</h3>
+      <div class="feature-card" onclick="window.mostrarTela('tela-escala')">
+        <div class="card-icon dark"><i class="fas fa-calendar-alt"></i></div>
+        <h3>Minha Escala</h3>
       </div>
+      <div class="feature-card emergency" onclick="window.ativarEmergencia()" id="emergenciaBtn">
+        <div class="card-icon danger"><i class="fas fa-exclamation-triangle"></i></div>
+        <h3>🚨 EMERGÊNCIA</h3>
+      </div>
+      <div class="feature-card whatsapp" onclick="window.abrirSuporteWhatsApp()">
+        <div class="card-icon"><i class="fab fa-whatsapp"></i></div>
+        <h3>Suporte WhatsApp</h3>
+      </div>
+    </div>
+    <div class="action-footer">
+      <button class="btn btn-secondary" onclick="window.logout()"><i class="fas fa-sign-out-alt"></i> Sair</button>
     </div>
   </section>
 
   <section id="tela-rotas" class="tela hidden">
-    <div class="section-header"><h2>Rotas Disponíveis</h2></div>
+    <div class="section-header"><h2><i class="fas fa-route"></i> Rotas Disponíveis</h2></div>
     <div class="search-filter">
-        <input type="text" id="routeSearch" class="search-input" placeholder="Buscar rota...">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" id="routeSearch" class="search-input" placeholder="Buscar rota..." oninput="window.searchRoutes()">
+      </div>
+      <div class="filter-tabs">
+        <button class="filter-tab active" onclick="window.filterRoutes('all')">Todas</button>
+        <button class="filter-tab" onclick="window.filterRoutes('adm')">ADM</button>
+        <button class="filter-tab" onclick="window.filterRoutes('operacional')">Operacional</button>
+        <button class="filter-tab" onclick="window.filterRoutes('retorno')">Retorno</button>
+      </div>
     </div>
-    <div id="routesContainer" class="routes-container"></div>
-    <div class="action-footer"><button class="btn btn-secondary" id="btnVoltarMotorista">Voltar</button></div>
+    <div class="routes-container" id="routesContainer"></div>
+    <div class="action-footer">
+      <button class="btn btn-secondary" onclick="window.mostrarTela('tela-motorista')"><i class="fas fa-arrow-left"></i> Voltar</button>
+    </div>
   </section>
 
   <section id="tela-passageiro" class="tela hidden">
-    <div class="section-header"><h2>Monitoramento</h2></div>
+    <div class="section-header"><h2><i class="fas fa-users"></i> Passageiro</h2></div>
     <div class="cards-grid">
-        <div class="feature-card" id="btnVerRotasPassageiro">
-            <div class="card-icon primary"><i class="fas fa-map"></i></div>
-            <h3>Ver Rotas</h3>
-        </div>
-        <div class="feature-card whatsapp" onclick="window.open('https://wa.me/5593992059914', '_blank')">
-            <div class="card-icon"><i class="fab fa-whatsapp"></i></div>
-            <h3>Suporte</h3>
-        </div>
+      <div class="feature-card" onclick="window.mostrarTela('tela-rotas-passageiro')">
+        <div class="card-icon primary"><i class="fas fa-route"></i></div>
+        <h3>Ver Rotas</h3>
+      </div>
+      <div class="feature-card" onclick="window.mostrarAvisos()">
+        <div class="card-icon warning"><i class="fas fa-bullhorn"></i></div>
+        <h3>Avisos</h3>
+      </div>
+      <div class="feature-card" onclick="window.abrirFeedback('passageiro')">
+        <div class="card-icon secondary"><i class="fas fa-comment-dots"></i></div>
+        <h3>Feedback</h3>
+      </div>
+      <div class="feature-card whatsapp" onclick="window.abrirSuporteWhatsApp()">
+        <div class="card-icon"><i class="fab fa-whatsapp"></i></div>
+        <h3>Suporte WhatsApp</h3>
+      </div>
     </div>
-    <div class="action-footer"><button class="btn btn-secondary" id="btnVoltarPerfilPass">Voltar</button></div>
+    <div class="rotas-ativas-section">
+      <h3><i class="fas fa-bus"></i> Rotas Ativas Agora</h3>
+      <div class="rotas-ativas-container" id="rotasAtivasList">
+        <div class="loading-state"><i class="fas fa-spinner fa-spin"></i><p>Buscando...</p></div>
+      </div>
+    </div>
+    <div class="action-footer">
+      <button class="btn btn-secondary" onclick="window.mostrarTela('telaEscolhaPerfil')"><i class="fas fa-arrow-left"></i> Voltar</button>
+    </div>
   </section>
 
   <section id="tela-rotas-passageiro" class="tela hidden">
-      <div class="section-header"><h2>Rotas Ativas</h2></div>
-      <div class="rotas-ativas-container" id="rotasPassageiroContainer">
-          <div class="loading-state"><p>Carregando...</p></div>
-      </div>
-      <div class="action-footer"><button class="btn btn-secondary" id="btnVoltarPassageiroMenu">Voltar</button></div>
+    <div class="section-header"><h2><i class="fas fa-route"></i> Todas as Rotas</h2></div>
+    <div class="rotas-passageiro-container" id="rotasPassageiroContainer"></div>
+    <div class="action-footer">
+      <button class="btn btn-secondary" onclick="window.mostrarTela('tela-passageiro')"><i class="fas fa-arrow-left"></i> Voltar</button>
+    </div>
   </section>
 
   <section id="tela-admin-login" class="tela hidden">
-    <div class="section-header"><h2>Login Admin</h2></div>
+    <div class="section-header"><h2><i class="fas fa-cogs"></i> Acesso Administrativo</h2></div>
     <div class="auth-card">
-      <input id="adminEmail" type="email" class="form-input mb-2" placeholder="Email">
-      <input id="adminSenha" type="password" class="form-input mb-2" placeholder="Senha">
-      <button class="btn btn-primary btn-block" id="btnLoginAdmin">Entrar</button>
+      <div class="auth-icon admin"><i class="fas fa-shield-alt"></i></div>
+      <div class="form-group">
+        <label>E-mail</label>
+        <input type="email" id="adminEmail" class="form-input">
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="adminSenha" class="form-input">
+      </div>
+      <button class="btn btn-primary btn-block" onclick="window.loginAdmin()">Entrar</button>
     </div>
-    <div class="action-footer"><button class="btn btn-secondary" id="btnVoltarPerfilAdmin">Voltar</button></div>
+    <div class="action-footer">
+      <button class="btn btn-secondary" onclick="window.mostrarTela('telaEscolhaPerfil')"><i class="fas fa-arrow-left"></i> Voltar</button>
+    </div>
   </section>
 
   <section id="tela-admin-dashboard" class="tela hidden">
-    <div class="section-header"><h2>Painel Admin</h2></div>
+    <div class="section-header"><h2><i class="fas fa-tachometer-alt"></i> Painel de Controle</h2></div>
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon primary"><i class="fas fa-bus"></i></div>
-        <div class="stat-content"><h3 id="adminTotalRotas">0</h3><p>Ativos</p></div>
+        <div class="stat-content"><h3 id="motoristasAtivosCount">0</h3><p>Ativos</p></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon warning"><i class="fas fa-route"></i></div>
+        <div class="stat-content"><h3 id="rotasAtivasCount">0</h3><p>Rotas</p></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon danger"><i class="fas fa-exclamation-triangle"></i></div>
+        <div class="stat-content"><h3 id="emergenciasCount">0</h3><p>Emergências</p></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon secondary"><i class="fas fa-comments"></i></div>
+        <div class="stat-content"><h3 id="feedbacksCount">0</h3><p>Feedbacks</p></div>
       </div>
     </div>
     
     <div class="dashboard-tabs">
-        <button class="dashboard-tab active" data-tab="tabRotas">Rotas</button>
-        <button class="dashboard-tab" data-tab="tabEmergencias">Emergências</button>
-        <button class="dashboard-tab" data-tab="tabFeedbacks">Feedbacks</button>
+      <button class="dashboard-tab active" onclick="window.mostrarTab('rotas')">Rotas</button>
+      <button class="dashboard-tab" onclick="window.mostrarTab('emergencias')">Emergências</button>
+      <button class="dashboard-tab" onclick="window.mostrarTab('feedbacks')">Feedbacks</button>
+      <button class="dashboard-tab" onclick="window.mostrarTab('notificacoes')">Notificações</button>
+      <button class="dashboard-tab" onclick="window.mostrarTab('gestao')">Gestão</button>
     </div>
 
-    <div id="tabRotas" class="tab-content active">
-        <div id="adminRotasList" class="rotas-admin-container"></div>
+    <div class="tab-content active" id="tabRotas">
+      <div class="rotas-admin-container" id="adminRotasList"></div>
     </div>
-    <div id="tabEmergencias" class="tab-content">
-        <div id="emergenciasList" class="emergencias-container"></div>
+    <div class="tab-content" id="tabEmergencias">
+      <div class="emergencias-container" id="emergenciasList"></div>
     </div>
-    <div id="tabFeedbacks" class="tab-content">
-        <div id="feedbacksList" class="feedbacks-container"></div>
+    <div class="tab-content" id="tabFeedbacks">
+      <div class="feedbacks-container" id="feedbacksList"></div>
+    </div>
+    <div class="tab-content" id="tabNotificacoes">
+      <div class="notificacao-form">
+        <input type="text" id="notificacaoTitulo" class="form-input" placeholder="Título">
+        <textarea id="notificacaoMensagem" class="form-input mt-2" placeholder="Mensagem"></textarea>
+        <select id="notificacaoDestino" class="form-input mt-2">
+          <option value="todos">Todos</option>
+          <option value="motoristas">Motoristas</option>
+          <option value="passageiros">Passageiros</option>
+        </select>
+        <button class="btn btn-primary btn-block mt-3" onclick="window.enviarNotificacaoGeral()">Enviar</button>
+      </div>
+    </div>
+    <div class="tab-content" id="tabGestao">
+        <div class="admin-actions">
+            <div class="actions-grid">
+                <div class="admin-action-card" onclick="window.gerenciarAvisos()"><h4>Avisos</h4></div>
+                <div class="admin-action-card" onclick="window.gerenciarEscalas()"><h4>Escalas</h4></div>
+                <div class="admin-action-card" onclick="window.mostrarTela('tela-relatorios')"><h4>Relatórios</h4></div>
+            </div>
+        </div>
     </div>
 
-    <div class="action-footer"><button class="btn btn-secondary" id="logoutBtnAdmin">Sair</button></div>
+    <div class="action-footer">
+      <button class="btn btn-secondary" onclick="window.logout()">Sair</button>
+    </div>
   </section>
 
-  <section id="tela-feedback" class="tela hidden">
-      <div class="section-header"><h2>Enviar Feedback</h2></div>
-      <div class="feedback-form">
-          <select id="feedbackTipo" class="form-input mb-2">
-              <option value="sugestao">Sugestão</option>
-              <option value="reclamacao">Reclamação</option>
-              <option value="problema">Problema Mecânico</option>
-          </select>
-          <textarea id="feedbackMsg" class="form-input mb-2" rows="4" placeholder="Mensagem..."></textarea>
-          <button class="btn btn-primary btn-block" id="btnEnviarFeedbackReal">Enviar</button>
-      </div>
-      <div class="action-footer"><button class="btn btn-secondary" id="btnCancelarFeedback">Cancelar</button></div>
+  <section id="tela-feedback-motorista" class="tela hidden">
+    <div class="section-header"><h2>Feedback Motorista</h2></div>
+    <div class="feedback-form">
+        <select id="feedbackTipomotorista" class="form-input">
+            <option value="sugestao">Sugestão</option>
+            <option value="melhoria">Melhoria</option>
+            <option value="reclamacao">Reclamação</option>
+            <option value="problema">Problema Técnico</option>
+        </select>
+        <textarea id="feedbackMensagemmotorista" class="form-input mt-2" rows="5"></textarea>
+        <div class="form-actions mt-3">
+            <button class="btn btn-primary" onclick="window.enviarFeedback('motorista')">Enviar</button>
+            <button class="btn btn-secondary" onclick="window.mostrarTela('tela-motorista')">Cancelar</button>
+        </div>
+    </div>
+  </section>
+
+  <section id="tela-feedback-passageiro" class="tela hidden">
+    <div class="section-header"><h2>Feedback Passageiro</h2></div>
+    <div class="feedback-form">
+        <select id="feedbackTipopassageiro" class="form-input">
+            <option value="sugestao">Sugestão</option>
+            <option value="reclamacao">Reclamação</option>
+        </select>
+        <textarea id="feedbackMensagempassageiro" class="form-input mt-2" rows="5"></textarea>
+        <div class="form-actions mt-3">
+            <button class="btn btn-primary" onclick="window.enviarFeedback('passageiro')">Enviar</button>
+            <button class="btn btn-secondary" onclick="window.mostrarTela('tela-passageiro')">Cancelar</button>
+        </div>
+    </div>
+  </section>
+
+  <section id="tela-escala" class="tela hidden">
+    <div class="section-header"><h2>Minha Escala</h2></div>
+    <div class="escala-container">
+        <div class="escala-card">
+            <div class="escala-dias" id="escalaDias"><p>Carregando...</p></div>
+        </div>
+    </div>
+    <div class="action-footer"><button class="btn btn-secondary" onclick="window.mostrarTela('tela-motorista')">Voltar</button></div>
+  </section>
+
+  <section id="tela-relatorios" class="tela hidden">
+    <div class="section-header"><h2>Relatórios</h2></div>
+    <div id="relatoriosContainer"></div>
+    <div class="action-footer"><button class="btn btn-secondary" onclick="window.mostrarTela('tela-admin-dashboard')">Voltar</button></div>
   </section>
 
 </main>
@@ -227,5 +369,34 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+<script>
+  window.searchRoutes = () => {
+    const term = document.getElementById('routeSearch').value.toLowerCase();
+    document.querySelectorAll('.route-item').forEach(item => {
+        const text = item.innerText.toLowerCase();
+        item.style.display = text.includes(term) ? 'flex' : 'none';
+    });
+  };
+  
+  window.filterRoutes = (type) => {
+    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    document.querySelectorAll('.route-item').forEach(item => {
+        item.style.display = (type === 'all' || item.dataset.tipo === type) ? 'flex' : 'none';
+    });
+  };
+
+  window.mostrarTab = (tabId) => {
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.dashboard-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(`tab${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`).classList.add('active');
+    event.target.classList.add('active');
+  };
+  
+  // Função auxiliar para fechar modais
+  window.closeModal = (id) => { document.getElementById(id).style.display = 'none'; };
+</script>
+
 </body>
 </html>
