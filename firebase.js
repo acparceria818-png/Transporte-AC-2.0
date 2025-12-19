@@ -1,5 +1,6 @@
-// firebase.js - CONFIGURAÇÃO FIREBASE ATUALIZADA
+// firebase.js - CONFIGURAÇÃO CORRIGIDA
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+
 import { 
   getFirestore, 
   doc, 
@@ -8,7 +9,7 @@ import {
   updateDoc,
   deleteDoc,
   collection,
-  onSnapshot,
+  onSnapshot,  // ADICIONADO
   query,
   where,
   getDocs,
@@ -261,6 +262,7 @@ export {
   where,
   orderBy,
   serverTimestamp,
+  onSnapshot,  // EXPORTADO AGORA
   
   // Authentication
   loginEmailSenha,
