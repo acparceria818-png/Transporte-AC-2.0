@@ -1,6 +1,5 @@
-// firebase.js - CONFIGURAÇÃO CORRIGIDA
+// firebase.js - VERSÃO CORRIGIDA
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-
 import { 
   getFirestore, 
   doc, 
@@ -9,7 +8,7 @@ import {
   updateDoc,
   deleteDoc,
   collection,
-  onSnapshot,  // ADICIONADO
+  onSnapshot,
   query,
   where,
   getDocs,
@@ -17,12 +16,6 @@ import {
   serverTimestamp,
   orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-import { 
-  getAuth,
-  signInWithEmailAndPassword,
-  signOut 
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // Configuração Firebase
 const firebaseConfig = {
@@ -38,28 +31,6 @@ const firebaseConfig = {
 // Inicialização
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app);
-
-// ================= FUNÇÕES DE AUTENTICAÇÃO =================
-async function loginEmailSenha(email, senha) {
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, senha);
-    return userCredential.user;
-  } catch (error) {
-    throw new Error(getErrorMessage(error.code));
-  }
-}
-
-function getErrorMessage(errorCode) {
-  const messages = {
-    'auth/invalid-email': 'E-mail inválido',
-    'auth/user-disabled': 'Usuário desativado',
-    'auth/user-not-found': 'Usuário não encontrado',
-    'auth/wrong-password': 'Senha incorreta',
-    'auth/too-many-requests': 'Muitas tentativas. Tente novamente mais tarde'
-  };
-  return messages[errorCode] || 'Erro ao fazer login';
-}
 
 // ================= FUNÇÕES DO BANCO DE DADOS =================
 
@@ -67,15 +38,6 @@ function getErrorMessage(errorCode) {
 async function getColaborador(matricula) {
   const docRef = doc(db, 'colaboradores', matricula);
   return await getDoc(docRef);
-}
-
-async function getColaboradorByEmail(email) {
-  const q = query(
-    collection(db, 'colaboradores'),
-    where("email", "==", email)
-  );
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.empty ? null : querySnapshot.docs[0];
 }
 
 // Localização
@@ -219,35 +181,10 @@ async function resolverFeedback(feedbackId) {
   });
 }
 
-async function responderFeedback(feedbackId, resposta) {
-  const docRef = doc(db, 'feedbacks', feedbackId);
-  return await updateDoc(docRef, {
-    status: 'respondido',
-    resposta: resposta,
-    respondidoEm: serverTimestamp()
-  });
-}
-
-// ================= RELATÓRIOS =================
-async function getEstatisticasDashboard() {
-  const [rotasSnapshot, emergenciasSnapshot, feedbacksSnapshot] = await Promise.all([
-    getDocs(collection(db, 'rotas_em_andamento')),
-    getDocs(query(collection(db, 'emergencias'), where('status', '==', 'pendente'))),
-    getDocs(query(collection(db, 'feedbacks'), where('status', '==', 'pendente')))
-  ]);
-
-  return {
-    totalRotasAtivas: rotasSnapshot.docs.filter(doc => doc.data().ativo !== false).length,
-    totalEmergencias: emergenciasSnapshot.docs.length,
-    totalFeedbacks: feedbacksSnapshot.docs.length
-  };
-}
-
 // ================= EXPORTAÇÕES =================
 export {
-  // Firebase instances
+  // Firestore instance
   db,
-  auth,
   
   // Firestore functions
   doc,
@@ -262,14 +199,10 @@ export {
   where,
   orderBy,
   serverTimestamp,
-  onSnapshot,  // EXPORTADO AGORA
-  
-  // Authentication
-  loginEmailSenha,
+  onSnapshot,
   
   // Database operations
   getColaborador,
-  getColaboradorByEmail,
   updateLocalizacao,
   registrarEmergencia,
   registrarFeedback,
@@ -291,9 +224,5 @@ export {
   updateEscala,
   deleteEscala,
   resolverEmergencia,
-  resolverFeedback,
-  responderFeedback,
-  
-  // Reports
-  getEstatisticasDashboard
+  resolverFeedback
 };
