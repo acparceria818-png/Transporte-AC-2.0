@@ -4,60 +4,46 @@ import { UI } from './ui.js';
 
 export const Auth = {
   loginMotorista: async (matriculaInput) => {
-    if (!matriculaInput) {
-      UI.toast('Digite a matrícula', 'error');
-      return null;
-    }
+    if (!matriculaInput) { UI.toast('Digite a matrícula', 'error'); return null; }
     const matricula = matriculaInput.trim().toUpperCase();
-
+    
     try {
       UI.showLoading('Validando...');
-      let dadosMotorista = null;
-
-      // 1. Tenta pelo ID do documento
+      let dados = null;
+      
+      // Tenta pelo ID direto
       const docRef = doc(db, 'colaboradores', matricula);
       const docSnap = await getDoc(docRef);
-
+      
       if (docSnap.exists()) {
-        dadosMotorista = docSnap.data();
+        dados = docSnap.data();
       } else {
-        // 2. Tenta pelo campo 'matricula'
+        // Tenta por query
         const q = query(collection(db, 'colaboradores'), where("matricula", "==", matricula));
-        const querySnap = await getDocs(q);
-        if (!querySnap.empty) dadosMotorista = querySnap.docs[0].data();
+        const qs = await getDocs(q);
+        if (!qs.empty) dados = qs.docs[0].data();
       }
 
       UI.hideLoading();
 
-      if (!dadosMotorista) {
-        UI.alert('Erro', `Matrícula "${matricula}" não encontrada.`, 'error');
-        return null;
-      }
+      if (!dados) { UI.alert('Erro', 'Matrícula não encontrada', 'error'); return null; }
+      if (!dados.ativo) { UI.alert('Acesso Negado', 'Colaborador inativo', 'warning'); return null; }
 
-      if (dadosMotorista.ativo === false) { // Verifica explícito false
-        UI.alert('Acesso Negado', 'Colaborador inativo.', 'warning');
-        return null;
-      }
-
-      const usuario = {
-        nome: dadosMotorista.nome || 'Motorista',
-        matricula: matricula,
-        perfil: 'motorista'
-      };
-      localStorage.setItem('ac_user', JSON.stringify(usuario));
-      return usuario;
-
-    } catch (error) {
+      const user = { nome: dados.nome, matricula: matricula, perfil: 'motorista' };
+      localStorage.setItem('ac_user', JSON.stringify(user));
+      return user;
+    } catch (e) {
       UI.hideLoading();
-      console.error(error);
-      UI.alert('Erro', 'Falha na conexão: ' + error.message, 'error');
+      console.error(e);
+      UI.alert('Erro', 'Falha na conexão', 'error');
       return null;
     }
   },
 
   loginAdmin: async (email, senha) => {
-    if (email === "admin@acparceria.com" && senha === "050370") {
-      const user = { nome: "Admin", email, perfil: 'admin' };
+    // Validação simples (Substitua por Auth real em produção)
+    if (email === 'admin@acparceria.com' && senha === '050370') {
+      const user = { nome: 'Admin', email, perfil: 'admin' };
       localStorage.setItem('ac_user', JSON.stringify(user));
       return user;
     }
@@ -66,12 +52,13 @@ export const Auth = {
   },
 
   checkSession: () => {
-    const saved = localStorage.getItem('ac_user');
-    return saved ? JSON.parse(saved) : null;
+    const s = localStorage.getItem('ac_user');
+    return s ? JSON.parse(s) : null;
   },
 
   logout: () => {
     localStorage.removeItem('ac_user');
+    localStorage.removeItem('ac_onibus');
     window.location.reload();
   }
 };
