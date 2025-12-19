@@ -14,10 +14,6 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 
-  <script type="module" src="firebase.js"></script>
-  <script type="module" src="ui.js"></script>
-  <script type="module" src="maps.js"></script>
-  <script type="module" src="auth.js"></script>
   <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -42,7 +38,6 @@
 </div>
 
 <main class="container">
-
   <section id="welcome" class="tela ativa">
     <div class="welcome-content">
       <img src="avatar.png" class="avatar" alt="Avatar" />
@@ -121,6 +116,9 @@
 
   <section id="tela-rotas" class="tela hidden">
     <div class="section-header"><h2>Rotas Disponíveis</h2></div>
+    <div class="search-filter">
+        <input type="text" id="routeSearch" class="search-input" placeholder="Buscar rota..." oninput="window.searchRoutes()">
+    </div>
     <div id="routesContainer" class="routes-container"></div>
     <div class="action-footer"><button class="btn btn-secondary" onclick="window.mostrarTela('tela-motorista')">Voltar</button></div>
   </section>
@@ -160,10 +158,7 @@
   <section id="tela-admin-dashboard" class="tela hidden">
     <div class="section-header"><h2>Painel Admin</h2></div>
     <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon primary"><i class="fas fa-bus"></i></div>
-        <div class="stat-content"><h3 id="adminTotalRotas">0</h3><p>Ativos</p></div>
-      </div>
+        <div class="stat-card"><h3 id="adminTotalRotas">0</h3><p>Ativos</p></div>
     </div>
     
     <div class="dashboard-tabs">
@@ -180,20 +175,27 @@
         <div class="cards-grid">
             <div class="feature-card" onclick="window.gerenciarAvisos()"><h3>Gerenciar Avisos</h3></div>
             <div class="feature-card" onclick="window.gerenciarEscalas()"><h3>Gerenciar Escalas</h3></div>
+            <div class="feature-card" onclick="window.mostrarTela('tela-relatorios')"><h3>Relatórios</h3></div>
+            <div class="feature-card" onclick="window.notificarGeral()"><h3>Enviar Notificação</h3></div>
         </div>
     </div>
-
     <div class="action-footer"><button class="btn btn-secondary" onclick="window.logout()">Sair</button></div>
   </section>
 
   <section id="tela-escala" class="tela hidden">
     <div class="section-header"><h2>Minha Escala</h2></div>
-    <div class="escala-container" id="escalaConteudo"></div>
+    <div id="escalaConteudo"></div>
     <div class="action-footer"><button class="btn btn-secondary" onclick="window.mostrarTela('tela-motorista')">Voltar</button></div>
   </section>
 
+  <section id="tela-relatorios" class="tela hidden">
+    <div class="section-header"><h2>Relatórios</h2></div>
+    <div id="relatoriosContainer"></div>
+    <div class="action-footer"><button class="btn btn-secondary" onclick="window.mostrarTela('tela-admin-dashboard')">Voltar</button></div>
+  </section>
+
   <section id="tela-feedback" class="tela hidden">
-    <div class="section-header"><h2>Enviar Feedback</h2></div>
+    <div class="section-header"><h2>Feedback</h2></div>
     <div class="feedback-form">
         <select id="feedbackTipo" class="form-input mb-2">
             <option value="sugestao">Sugestão</option>
