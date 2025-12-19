@@ -54,6 +54,114 @@ window.estadoApp = {
   trajetoHistory
 };
 
+// ========== MONITORAMENTO DE USUÁRIOS ONLINE ==========
+function iniciarMonitoramentoOnline() {
+  console.log('📡 Iniciando monitoramento de usuários online...');
+  
+  // Função para atualizar contador de usuários online
+  async function atualizarContadorOnline() {
+    try {
+      const q = query(collection(db, 'rotas_em_andamento'), 
+        where("ativo", "==", true),
+        where("online", "==", true)
+      );
+      
+      const snapshot = await getDocs(q);
+      const usuariosOnline = snapshot.docs.length;
+      
+      // Atualizar no estado global
+      estadoApp.onlineUsers = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Atualizar na interface se o elemento existir
+      const element = document.getElementById('usuariosOnline');
+      if (element) {
+        element.textContent = usuariosOnline;
+      }
+      
+      // Se estiver na tela de relatórios, atualizar a lista completa
+      if (document.getElementById('tela-relatorios')?.classList.contains('ativa')) {
+        atualizarListaOnlineUsers();
+      }
+      
+      console.log(`👥 Usuários online: ${usuariosOnline}`);
+      
+    } catch (error) {
+      console.error('Erro ao contar usuários online:', error);
+    }
+  }
+  
+  // Função para atualizar lista completa de usuários online
+  function atualizarListaOnlineUsers() {
+    const container = document.getElementById('onlineUsersList');
+    if (!container) return;
+    
+    if (estadoApp.onlineUsers.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <i class="fas fa-users-slash"></i>
+          <h4>Nenhum usuário online</h4>
+          <p>Nenhum motorista está ativo no momento.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    container.innerHTML = `
+      <div class="online-user-list">
+        ${estadoApp.onlineUsers.map(user => `
+          <div class="online-user-item">
+            <span class="online-dot"></span>
+            <div class="user-info">
+              <strong>${user.motorista || 'Sem nome'}</strong>
+              <small>${user.onibus || ''} ${user.rota ? '• ' + user.rota : ''}</small>
+            </div>
+            <small>${user.ultimaAtualizacao ? new Date(user.ultimaAtualizacao.toDate()).toLocaleTimeString() : ''}</small>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+  
+  // Atualizar a cada 30 segundos
+  const intervalo = setInterval(() => {
+    atualizarContadorOnline();
+  }, 30000);
+  
+  // Primeira execução imediata
+  setTimeout(() => atualizarContadorOnline(), 1000);
+  
+  // Guardar intervalo para limpar depois se necessário
+  estadoApp.onlineInterval = intervalo;
+  
+  return intervalo;
+}
+
+// ========== INICIALIZAÇÃO ==========
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('🚀 AC Transporte Portal - Inicializando...');
+  
+  // Adicionar rodapé em todas as páginas
+  adicionarRodape();
+  
+  // Verificar sessão existente
+  verificarSessao();
+  
+  // Inicializar funcionalidades
+  initDarkMode();
+  initPWA();
+  initEventListeners();
+  initConnectionMonitor();
+  initAvisos();
+  
+  // Iniciar monitoramento online (AGORA A FUNÇÃO JÁ ESTÁ DEFINIDA)
+  iniciarMonitoramentoOnline();
+  
+  console.log('✅ Aplicativo inicializado com sucesso');
+});
+
 // ========== INICIALIZAÇÃO ==========
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('🚀 AC Transporte Portal - Inicializando...');
