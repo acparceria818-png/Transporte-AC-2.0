@@ -1,8 +1,15 @@
 // modules/admin.js - PAINEL ADMINISTRATIVO
-import { db, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, onSnapshot } from '../firebase.js';
+import { 
+  db, 
+  collection, 
+  onSnapshot, 
+  query, 
+  where, 
+  orderBy,
+  getDocs 
+} from '../firebase.js';
 import { getEstadoApp } from '../app.js';
-import { showLoading, hideLoading, mostrarNotificacao } from './ui.js';
-import { getRotasDisponiveis, getOnibusDisponiveis } from './database.js';
+import { mostrarTela, mostrarNotificacao } from './ui.js';
 
 export function initAdmin() {
   console.log('👨‍💼 Módulo administrativo inicializado');
