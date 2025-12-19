@@ -3,7 +3,7 @@ import { UI } from './ui.js';
 
 let map = null;
 let markers = {};
-let polylines = {}; // Guarda o histórico do trajeto
+let polylines = {};
 let wakeLock = null;
 
 export const Maps = {
@@ -13,7 +13,6 @@ export const Maps = {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap'
     }).addTo(map);
-    
     window.mapInstance = map;
   },
 
@@ -44,7 +43,7 @@ export const Maps = {
         .bindPopup(`<b>${rota}</b><br>${motorista}<br>${onibus}`);
     }
 
-    // Rastro (Polyline)
+    // Polyline (Rastro)
     if (!polylines[id]) {
       polylines[id] = L.polyline([], { color: 'blue', weight: 4 }).addTo(map);
     }
@@ -56,12 +55,7 @@ export const Maps = {
   },
 
   ativarWakeLock: async () => {
-    try { 
-      if ('wakeLock' in navigator) {
-        wakeLock = await navigator.wakeLock.request('screen');
-        console.log('Wake Lock ativo');
-      }
-    } catch (e) { console.warn(e); }
+    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
   },
 
   desativarWakeLock: () => {
