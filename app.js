@@ -1,4 +1,219 @@
-// app.js - REFATORADO COM MÓDULOS
+// app.js - CÓDIGO COMPLETO ATUALIZADO
+import { 
+  db,
+  auth,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  serverTimestamp,
+  getColaborador,
+  getColaboradorByEmail,
+  updateLocalizacao,
+  registrarEmergencia,
+  registrarFeedback,
+  registrarAviso,
+  monitorarRotas,
+  monitorarEmergencias,
+  monitorarFeedbacks,
+  monitorarAvisos,
+  getAvisos,
+  updateAviso,
+  deleteAviso,
+  getEscalas,
+  addEscala,
+  updateEscala,
+  deleteEscala,
+  resolverEmergencia,
+  resolverFeedback,
+  responderFeedback,
+  getRelatorios,
+  getEstatisticasDashboard,
+  getRotasPorTipo,
+  getMotoristasAtivos
+} from './firebase.js';
+
+// Estado global
+let estadoApp = {
+  motorista: null,
+  passageiro: null,
+  admin: null,
+  rotaAtiva: null,
+  onibusAtivo: null,
+  watchId: null,
+  isOnline: navigator.onLine,
+  perfil: null,
+  unsubscribeRotas: null,
+  unsubscribeEmergencias: null,
+  unsubscribeFeedbacks: null,
+  unsubscribeAvisos: null,
+  emergenciaAtiva: false,
+  avisosAtivos: [],
+  escalas: [],
+  estatisticas: null,
+  ultimaLocalizacao: null,
+  distanciaTotal: 0,
+  onlineUsers: [],
+  onlineInterval: null
+};
+
+// Dados de ônibus disponíveis
+const ONIBUS_DISPONIVEIS = [
+  { placa: 'TEZ-2J56', tag_ac: 'AC LO 583', tag_vale: '1JI347', cor: 'BRANCA', empresa: 'MUNDIAL P E L DE BENS MOVEIS LTDA' },
+  { placa: 'TEZ-2J60', tag_ac: 'AC LO 585', tag_vale: '1JI348', cor: 'BRANCA', empresa: 'MUNDIAL P E L DE BENS MOVEIS LTDA' },
+  { placa: 'TEZ-2J57', tag_ac: 'AC LO 584', tag_vale: '1JI349', cor: 'BRANCA', empresa: 'MUNDIAL P E L DE BENS MOVEIS LTDA' },
+  { placa: 'SJD5G38', tag_ac: 'AC LO 610', tag_vale: '1JI437', cor: 'BRANCA', empresa: 'MUNDIAL P E L DE BENS MOVEIS LTDA' },
+  { placa: 'SYA5A51', tag_ac: 'AC LO 611', tag_vale: '1JI436', cor: 'BRANCA', empresa: 'MUNDIAL P E L DE BENS MOVEIS LTDA' },
+  { placa: 'TEZ2J58', tag_ac: 'AC LO 609', tag_vale: '1JI420', cor: 'BRANCA', empresa: 'MUNDIAL P E L DE BENS MOVEIS LTDA' },
+  { placa: 'PZS6858', tag_ac: 'VL 080', tag_vale: '-', cor: 'BRANCA', empresa: 'A C PARCERIA E TERRAPLENAGEM LTDA' },
+  { placa: 'PZW5819', tag_ac: 'VL 083', tag_vale: '-', cor: 'BRANCA', empresa: 'A C PARCERIA E TERRAPLENAGEM LTDA' }
+];
+
+// Rotas disponíveis
+const ROTAS_DISPONIVEIS = [
+  { id: 'adm01', nome: 'ROTA ADM 01', tipo: 'adm', desc: 'Rota administrativa 01', mapsUrl: 'https://www.google.com/maps/d/u/1/edit?mid=18BCgBpobp1Olzmzy0RnPCUEd7Vnkc5s&usp=sharing' },
+  { id: 'adm02', nome: 'ROTA ADM 02', tipo: 'adm', desc: 'Rota administrativa 02', mapsUrl: 'https://www.google.com/maps/d/u/1/edit?mid=1WxbIX8nw0xyGBLMvvi1SF3DRuwmZ5oM&usp=sharing' },
+  { id: 'op01', nome: 'ROTA 01', tipo: 'operacional', desc: 'Rota operacional 01', mapsUrl: 'https://www.google.com/maps/d/u/1/edit?mid=1jCfFxq1ZwecS2IcHy7xGFLLgttsM-RQ&usp=sharing' },
+  { id: 'op02', nome: 'ROTA 02', tipo: 'operacional', desc: 'Rota operacional 02', mapsUrl: 'https://www.google.com/maps/d/u/1/edit?mid=1LCvNJxWBbZ_chpbdn_lk_Dm6NPA194g&usp=sharing' },
+  { id: 'op03', nome: 'ROTA 03', tipo: 'operacional', desc: 'Rota operacional 03', mapsUrl: 'https://www.google.com/maps/d/u/1/edit?mid=1bdwkrClh5AZml0mnDGlOzYcaR4w1BL0&usp=sharing' },
+  { id: 'op04', nome: 'ROTA 04', tipo: 'operacional', desc: 'Rota operacional 04', mapsUrl: 'https://www.google.com/maps/d/u/1/edit?mid=1ejibzdZkhX2QLnP9YgvvHdQpZELFvXo&usp=sharing' },
+  { id: 'op05', nome: 'ROTA 05', tipo: 'operacional', desc: 'Rota operacional 05', mapsUrl: 'https://www.google.com/maps/d/u/1/edit?mid=1L9xjAWFUupMc7eQbqVJz-SNWlYX5SHo&usp=sharing' },
+  { id: 'ret01', nome: 'RETORNO OVERLAND - ROTA 01', tipo: 'retorno', desc: 'Rota de retorno Overland 01', mapsUrl: 'https://www.google.com/maps/d/u/1/edit?mid=1ClQVIaRLOYYWHU7fvP87r1BVy85a_eg&usp=sharing' },
+  { id: 'ret02', nome: 'RETORNO OVERLAND - ROTA 02', tipo: 'retorno', desc: 'Rota de retorno Overland 02', mapsUrl: 'https://www.google.com/maps/d/u/1/edit?mid=1WOIMgeLgV01B8yk7HoX6tazdCHXQnok&usp=sharing' }
+];
+
+// ========== MONITORAMENTO DE USUÁRIOS ONLINE ==========
+function iniciarMonitoramentoOnline() {
+  console.log('📡 Iniciando monitoramento de usuários online...');
+  
+  // Função para atualizar contador de usuários online
+  async function atualizarContadorOnline() {
+    try {
+      const q = query(collection(db, 'rotas_em_andamento'), 
+        where("ativo", "==", true),
+        where("online", "==", true)
+      );
+      
+      const snapshot = await getDocs(q);
+      const usuariosOnline = snapshot.docs.length;
+      
+      // Atualizar no estado global
+      estadoApp.onlineUsers = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Atualizar na interface se o elemento existir
+      const element = document.getElementById('usuariosOnline');
+      if (element) {
+        element.textContent = usuariosOnline;
+      }
+      
+      // Se estiver na tela de relatórios, atualizar a lista completa
+      if (document.getElementById('tela-relatorios')?.classList.contains('ativa')) {
+        atualizarListaOnlineUsers();
+      }
+      
+      console.log(`👥 Usuários online: ${usuariosOnline}`);
+      
+    } catch (error) {
+      console.error('Erro ao contar usuários online:', error);
+    }
+  }
+  
+  // Função para atualizar lista completa de usuários online
+  function atualizarListaOnlineUsers() {
+    const container = document.getElementById('onlineUsersList');
+    if (!container) return;
+    
+    if (estadoApp.onlineUsers.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <i class="fas fa-users-slash"></i>
+          <h4>Nenhum usuário online</h4>
+          <p>Nenhum motorista está ativo no momento.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    container.innerHTML = `
+      <div class="online-user-list">
+        ${estadoApp.onlineUsers.map(user => `
+          <div class="online-user-item">
+            <span class="online-dot"></span>
+            <div class="user-info">
+              <strong>${user.motorista || 'Sem nome'}</strong>
+              <small>${user.onibus || ''} ${user.rota ? '• ' + user.rota : ''}</small>
+            </div>
+            <small>${user.ultimaAtualizacao ? new Date(user.ultimaAtualizacao.toDate()).toLocaleTimeString() : ''}</small>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+  
+  // Atualizar a cada 30 segundos
+  const intervalo = setInterval(() => {
+    atualizarContadorOnline();
+  }, 30000);
+  
+  // Primeira execução imediata
+  setTimeout(() => atualizarContadorOnline(), 1000);
+  
+  // Guardar intervalo para limpar depois se necessário
+  estadoApp.onlineInterval = intervalo;
+  
+  return intervalo;
+}
+
+// ========== INICIALIZAÇÃO ==========
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('🚀 AC Transporte Portal - Inicializando...');
+  
+  // Adicionar rodapé em todas as páginas
+  adicionarRodape();
+  
+  // Verificar sessão existente
+  verificarSessao();
+  
+  // Inicializar funcionalidades
+  initDarkMode();
+  initPWA();
+  initEventListeners();
+  initConnectionMonitor();
+  initAvisos();
+  
+  // Iniciar monitoramento online
+  iniciarMonitoramentoOnline();
+  
+  console.log('✅ Aplicativo inicializado com sucesso');
+});
+
+// ========== ADICIONAR RODAPÉ ==========
+function adicionarRodape() {
+  const footer = document.createElement('footer');
+  footer.className = 'footer-dev';
+  footer.innerHTML = `
+    <div class="footer-content">
+      <span>Desenvolvido por Juan Sales</span>
+      <div class="footer-contacts">
+        <a href="tel:+5594992233753"><i class="fas fa-phone"></i> (94) 99223-3753</a>
+        <a href="mailto:Juansalesadm@gmail.com"><i class="fas fa-envelope"></i> Juansalesadm@gmail.com</a>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(footer);
+}
+
+// ... continue com o resto do seu código ...// app.js - REFATORADO COM MÓDULOS
 import { 
   db,
   auth,
