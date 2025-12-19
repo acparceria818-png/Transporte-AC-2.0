@@ -1,7 +1,7 @@
-// app.js - CÓDIGO COMPLETO RESTAURADO E MODULARIZADO
+// app.js
 import { 
     db, collection, getDocs, doc, setDoc, addDoc, onSnapshot, serverTimestamp, query, where, orderBy, 
-    updateDoc, deleteDoc, getDoc 
+    updateDoc, deleteDoc, getDoc, monitorarRotas, monitorarAvisos 
 } from './firebase.js';
 import { UI } from './ui.js';
 import { Maps } from './maps.js';
@@ -33,11 +33,10 @@ const ROTAS_DISPONIVEIS = [
 
 let estado = { usuario: null, onibus: null, watchId: null, rotaAtiva: null, perfilFeedback: null };
 
-// === INICIALIZAÇÃO ===
 document.addEventListener('DOMContentLoaded', () => {
     Maps.init();
     
-    // Recupera sessão
+    // Verifica sessão
     const user = Auth.checkSession();
     if(user) {
         estado.usuario = user;
@@ -50,14 +49,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Carrega ônibus na lista
+    // Carrega ônibus
     const listaOnibus = document.getElementById('onibusList');
     if(listaOnibus) {
         listaOnibus.innerHTML = '';
         ONIBUS_DISPONIVEIS.forEach(bus => {
             const div = document.createElement('div');
             div.className = 'onibus-card';
-            div.innerHTML = `<div class="onibus-icon"><i class="fas fa-bus"></i></div><div class="onibus-info"><h4>${bus.placa}</h4><p>${bus.empresa}</p></div>`;
+            div.innerHTML = `<div class="onibus-icon"><i class="fas fa-bus"></i></div><div class="onibus-info"><h4>${bus.placa}</h4><p>${bus.empresa}</p><small>${bus.tag_ac}</small></div>`;
             div.onclick = () => {
                 estado.onibus = bus;
                 localStorage.setItem('ac_onibus', JSON.stringify(bus));
@@ -67,12 +66,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Botão fechar mapa
-    const btnMap = document.getElementById('fecharMapaBtn');
-    if(btnMap) btnMap.onclick = Maps.fecharMapa;
+    // Botão mapa
+    document.getElementById('fecharMapaBtn').onclick = Maps.fecharMapa;
 });
 
-// === EXPORTAÇÕES PARA O HTML (window) ===
+// === EXPOSIÇÃO GLOBAL (PARA O HTML FUNCIONAR) ===
 window.entrarNoPortal = () => UI.mostrarTela('telaEscolhaPerfil');
 window.mostrarTela = UI.mostrarTela;
 window.selecionarPerfil = (p) => {
@@ -94,17 +92,26 @@ window.loginAdmin = async () => {
     if(user) { estado.usuario = user; prepararTelaAdmin(); }
 };
 
-window.logout = () => {
-    window.pararRota();
-    Auth.logout();
-};
+window.logout = () => { window.pararRota(); Auth.logout(); };
 
-// === MOTORISTA ===
+// === LÓGICA MOTORISTA ===
 function prepararTelaMotorista() {
     document.getElementById('motoristaNomeDisplay').innerText = estado.usuario.nome.split(' ')[0];
     document.getElementById('motoristaOnibusDisplay').innerText = estado.onibus ? estado.onibus.placa : '';
     document.getElementById('userStatus').style.display = 'flex';
     document.getElementById('userName').innerText = estado.usuario.nome;
+    
+    // Carrega avisos ativos
+    monitorarAvisos(avisos => {
+        const badge = document.getElementById('avisosCount');
+        if(avisos.length > 0) {
+            badge.innerText = avisos.length;
+            badge.style.display = 'block';
+        } else {
+            badge.style.display = 'none';
+        }
+    });
+    
     UI.mostrarTela('tela-motorista');
 }
 
@@ -116,6 +123,7 @@ window.carregarRotas = () => {
     ROTAS_DISPONIVEIS.forEach(r => {
         const item = document.createElement('div');
         item.className = 'route-item';
+        item.dataset.tipo = r.tipo;
         item.innerHTML = `<div><h4>${r.nome}</h4><small>${r.desc}</small></div><button class="btn btn-primary btn-small">Iniciar</button>`;
         item.querySelector('button').onclick = () => window.iniciarRota(r.nome);
         div.appendChild(item);
@@ -125,29 +133,27 @@ window.carregarRotas = () => {
 window.searchRoutes = () => {
     const term = document.getElementById('routeSearch').value.toLowerCase();
     document.querySelectorAll('.route-item').forEach(item => {
-        const text = item.innerText.toLowerCase();
-        item.style.display = text.includes(term) ? 'flex' : 'none';
+        item.style.display = item.innerText.toLowerCase().includes(term) ? 'flex' : 'none';
     });
 };
 
 window.iniciarRota = async (nome) => {
-    if(!await UI.confirm('Iniciar Viagem?', `Rota: ${nome}`)) return;
+    if(!await UI.confirm('Iniciar?', `Rota: ${nome}`)) return;
+    
     estado.rotaAtiva = nome;
     document.getElementById('rotaStatusTexto').innerText = `Em trânsito: ${nome}`;
+    document.getElementById('rotaStatusTexto').style.color = 'var(--success)';
     document.getElementById('btnPararRota').style.display = 'inline-flex';
     UI.mostrarTela('tela-motorista');
     
-    // GPS + WAKE LOCK
+    // GPS + Polyline + WakeLock
     if(navigator.geolocation) {
         Maps.init();
         const opts = { enableHighAccuracy: true, timeout: 10000 };
         estado.watchId = navigator.geolocation.watchPosition(pos => {
             const { latitude, longitude, speed } = pos.coords;
+            
             // Atualiza local e Firebase
-            Maps.atualizarMarcadorMotorista(estado.usuario.matricula, {
-                latitude, longitude, motorista: estado.usuario.nome, 
-                onibus: estado.onibus.placa, rota: nome
-            });
             const dados = {
                 motorista: estado.usuario.nome, matricula: estado.usuario.matricula,
                 onibus: estado.onibus.placa, rota: nome, latitude, longitude,
@@ -155,25 +161,26 @@ window.iniciarRota = async (nome) => {
                 ativo: true, timestamp: serverTimestamp()
             };
             setDoc(doc(db, "rotas_em_andamento", estado.usuario.matricula), dados, { merge: true });
+            
+            // Rastro local
+            Maps.atualizarMarcadorMotorista(estado.usuario.matricula, dados);
+            
         }, err => console.error(err), opts);
         Maps.ativarWakeLock();
     }
 };
 
 window.pararRota = async () => {
-    if(estado.rotaAtiva) {
-        if(!await UI.confirm('Parar?', 'Encerrar rota atual?')) return;
-        if(estado.watchId) navigator.geolocation.clearWatch(estado.watchId);
-        Maps.desativarWakeLock();
-        await setDoc(doc(db, "rotas_em_andamento", estado.usuario.matricula), { ativo: false }, { merge: true });
-        estado.rotaAtiva = null;
-        document.getElementById('rotaStatusTexto').innerText = 'Nenhuma rota ativa';
-        document.getElementById('btnPararRota').style.display = 'none';
-        UI.toast('Rota encerrada');
-    }
+    if(!await UI.confirm('Parar?', 'Encerrar rota?')) return;
+    if(estado.watchId) navigator.geolocation.clearWatch(estado.watchId);
+    Maps.desativarWakeLock();
+    if(estado.usuario) await setDoc(doc(db, "rotas_em_andamento", estado.usuario.matricula), { ativo: false }, { merge: true });
+    estado.rotaAtiva = null;
+    document.getElementById('rotaStatusTexto').innerText = 'Nenhuma rota ativa';
+    document.getElementById('btnPararRota').style.display = 'none';
+    UI.toast('Rota encerrada');
 };
 
-// === EMERGÊNCIA ===
 window.ativarEmergencia = async () => {
     const { value: tipo } = await Swal.fire({
         title: 'EMERGÊNCIA', input: 'select',
@@ -189,7 +196,15 @@ window.ativarEmergencia = async () => {
     }
 };
 
-// === ADMIN - FUNÇÕES COMPLETAS RESTAURADAS ===
+window.mostrarAvisos = async () => {
+    const snap = await getDocs(collection(db, 'avisos'));
+    if(snap.empty) return UI.alert('Avisos', 'Nenhum aviso no momento.');
+    let msg = '';
+    snap.forEach(d => { if(d.data().ativo) msg += `• ${d.data().titulo}: ${d.data().mensagem}\n\n`; });
+    UI.alert('Avisos', msg);
+};
+
+// === ADMIN E GESTÃO ===
 function prepararTelaAdmin() {
     document.getElementById('userStatus').style.display = 'flex';
     document.getElementById('userName').innerText = 'Admin';
@@ -202,12 +217,94 @@ window.mostrarTab = (tabId) => {
     document.querySelectorAll('.dashboard-tab').forEach(t => t.classList.remove('active'));
     document.getElementById(`tab${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`).classList.add('active');
     event.target.classList.add('active');
+    
     if(tabId === 'rotas') carregarRotasAdmin();
     if(tabId === 'emergencias') carregarEmergenciasAdmin();
     if(tabId === 'feedbacks') carregarFeedbacksAdmin();
 };
 
-// GERENCIAR AVISOS (CÓDIGO ORIGINAL MODAL)
+// --- GESTÃO DE ESCALAS (LÓGICA COMPLEXA RESTAURADA) ---
+window.gerenciarEscalas = async () => {
+    UI.showLoading('Carregando...');
+    const snap = await getDocs(collection(db, 'escalas'));
+    const escalas = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    UI.hideLoading();
+
+    const html = `
+        <div style="text-align:left; max-height:400px; overflow-y:auto">
+            <button class="btn btn-primary btn-block mb-2" onclick="window.criarNovaEscala()">+ Nova Escala</button>
+            ${escalas.map(e => `
+                <div class="escala-admin-item">
+                    <b>${e.motorista}</b> (${e.matricula})<br>Período: ${e.periodo}
+                    <button class="btn btn-danger btn-small" style="margin-top:5px" onclick="window.excluirEscala('${e.id}')">Excluir</button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+    Swal.fire({ title: 'Gerenciar Escalas', html: html, showConfirmButton: false, showCloseButton: true });
+};
+
+window.criarNovaEscala = () => {
+    Swal.close();
+    // HTML complexo para os dias da semana
+    const dias = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+    let formHtml = `
+        <input id="escMotorista" class="swal2-input" placeholder="Nome Motorista">
+        <input id="escMatricula" class="swal2-input" placeholder="Matrícula">
+        <input id="escPeriodo" class="swal2-input" placeholder="Período (Ex: 01/01 a 07/01)">
+        <div style="text-align:left; margin-top:10px; height:200px; overflow-y:auto;">
+    `;
+    
+    dias.forEach(dia => {
+        formHtml += `
+            <div style="border:1px solid #eee; padding:5px; margin-bottom:5px;">
+                <label><input type="checkbox" id="check-${dia}"> ${dia}</label><br>
+                <input id="rota-${dia}" placeholder="Rota" style="width:100%; margin-bottom:5px;">
+                <select id="horario-${dia}" style="width:100%">
+                    <option value="06:00 - 14:00">06:00 - 14:00</option>
+                    <option value="14:00 - 22:00">14:00 - 22:00</option>
+                    <option value="22:00 - 06:00">22:00 - 06:00</option>
+                </select>
+            </div>
+        `;
+    });
+    formHtml += '</div>';
+
+    Swal.fire({
+        title: 'Nova Escala',
+        html: formHtml,
+        confirmButtonText: 'Salvar',
+        preConfirm: async () => {
+            const motorista = document.getElementById('escMotorista').value;
+            const matricula = document.getElementById('escMatricula').value;
+            const periodo = document.getElementById('escPeriodo').value;
+            if(!motorista || !matricula) return Swal.showValidationMessage('Preencha nome e matrícula');
+            
+            const diasSelecionados = [];
+            dias.forEach(dia => {
+                if(document.getElementById(`check-${dia}`).checked) {
+                    diasSelecionados.push({
+                        dia: dia,
+                        rota: document.getElementById(`rota-${dia}`).value,
+                        horario: document.getElementById(`horario-${dia}`).value
+                    });
+                }
+            });
+
+            await addDoc(collection(db, 'escalas'), { motorista, matricula, periodo, dias: diasSelecionados, timestamp: serverTimestamp() });
+        }
+    }).then((res) => { if(res.isConfirmed) { UI.toast('Escala Salva!'); window.gerenciarEscalas(); } });
+};
+
+window.excluirEscala = async (id) => {
+    if(await UI.confirm('Excluir?', 'Tem certeza?')) {
+        await deleteDoc(doc(db, 'escalas', id));
+        UI.toast('Excluído');
+        window.gerenciarEscalas();
+    }
+};
+
+// --- GESTÃO DE AVISOS ---
 window.gerenciarAvisos = async () => {
     UI.showLoading();
     const snap = await getDocs(collection(db, 'avisos'));
@@ -218,7 +315,7 @@ window.gerenciarAvisos = async () => {
         <div style="text-align:left; max-height:300px; overflow-y:auto;">
             ${avisos.map(a => `
                 <div style="border:1px solid #ddd; padding:10px; margin-bottom:5px; border-radius:5px;">
-                    <strong>${a.titulo}</strong><p style="margin:5px 0">${a.mensagem}</p>
+                    <strong>${a.titulo}</strong><p>${a.mensagem}</p>
                     <button class="btn btn-small btn-danger" onclick="window.excluirAviso('${a.id}')">Excluir</button>
                 </div>
             `).join('')}
@@ -230,78 +327,37 @@ window.gerenciarAvisos = async () => {
     `;
 
     Swal.fire({
-        title: 'Gerenciar Avisos',
-        html: html,
-        showCancelButton: true,
-        confirmButtonText: 'Salvar Novo',
+        title: 'Gerenciar Avisos', html: html, showCancelButton: true, confirmButtonText: 'Salvar Novo',
         preConfirm: async () => {
             const titulo = document.getElementById('newAvisoTitulo').value;
             const mensagem = document.getElementById('newAvisoMsg').value;
-            if(!titulo || !mensagem) return Swal.showValidationMessage('Preencha tudo');
-            await addDoc(collection(db, 'avisos'), { titulo, mensagem, timestamp: serverTimestamp(), ativo: true });
+            if(!titulo) return Swal.showValidationMessage('Preencha o título');
+            await addDoc(collection(db, 'avisos'), { titulo, mensagem, ativo: true, timestamp: serverTimestamp() });
         }
-    }).then((res) => {
-        if(res.isConfirmed) { UI.toast('Aviso salvo!'); window.gerenciarAvisos(); }
-    });
+    }).then((res) => { if(res.isConfirmed) { UI.toast('Salvo!'); window.gerenciarAvisos(); } });
 };
 
 window.excluirAviso = async (id) => {
     await deleteDoc(doc(db, 'avisos', id));
-    UI.toast('Aviso excluído');
-    Swal.close(); // Fecha e reabre para atualizar
+    UI.toast('Excluído');
     setTimeout(() => window.gerenciarAvisos(), 500);
 };
 
-// NOTIFICAÇÃO GERAL
-window.notificarGeral = async () => {
-    const { value: formValues } = await Swal.fire({
-        title: 'Enviar Notificação',
-        html:
-            '<input id="swal-input1" class="swal2-input" placeholder="Título">' +
-            '<input id="swal-input2" class="swal2-input" placeholder="Mensagem">',
-        focusConfirm: false,
-        preConfirm: () => {
-            return [
-                document.getElementById('swal-input1').value,
-                document.getElementById('swal-input2').value
-            ]
-        }
-    });
-
-    if (formValues) {
-        await addDoc(collection(db, "avisos"), {
-            titulo: formValues[0],
-            mensagem: formValues[1],
-            destino: 'todos',
-            timestamp: serverTimestamp(),
-            ativo: true
-        });
-        UI.toast('Notificação enviada!');
-    }
-};
-
-window.gerenciarEscalas = () => {
-    UI.alert('Em breve', 'Funcionalidade de escalas sendo migrada.');
-};
-
-// LISTAS DO ADMIN
+// LISTAS ADMIN
 function carregarRotasAdmin() {
     const div = document.getElementById('adminRotasList');
-    onSnapshot(collection(db, "rotas_em_andamento"), snap => {
+    monitorarRotas(rotas => {
         div.innerHTML = '';
         let count = 0;
-        snap.forEach(d => {
-            const data = d.data();
-            if(data.ativo) {
-                count++;
-                div.innerHTML += `
-                    <div class="rota-admin-card">
-                        <p><strong>${data.rota}</strong><br>${data.motorista} (${data.onibus})</p>
-                        <button class="btn btn-small btn-secondary" onclick="window.verMapaAdmin(${data.latitude}, ${data.longitude})">Ver no Mapa</button>
-                    </div>`;
-            }
+        rotas.forEach(r => {
+            count++;
+            div.innerHTML += `
+                <div class="rota-admin-card">
+                    <p><strong>${r.rota}</strong> - ${r.motorista} (${r.velocidade}km/h)</p>
+                    <button class="btn btn-small" onclick="window.verMapaAdmin(${r.latitude}, ${r.longitude})">Mapa</button>
+                </div>`;
         });
-        document.getElementById('adminTotalRotas').textContent = count;
+        document.getElementById('adminTotalRotas').innerText = count;
     });
 }
 
@@ -311,7 +367,7 @@ function carregarEmergenciasAdmin() {
         div.innerHTML = '';
         snap.forEach(d => {
             const data = d.data();
-            div.innerHTML += `<div class="emergencia-card"><strong>${data.tipo}</strong> - ${data.motorista}<br>${data.status}</div>`;
+            div.innerHTML += `<div class="emergencia-card"><strong>${data.tipo}</strong> - ${data.motorista}<br>Status: ${data.status}</div>`;
         });
     });
 }
@@ -322,7 +378,7 @@ function carregarFeedbacksAdmin() {
         div.innerHTML = '';
         snap.forEach(d => {
             const data = d.data();
-            div.innerHTML += `<div class="feedback-card"><strong>${data.tipo}</strong>: ${data.mensagem}</div>`;
+            div.innerHTML += `<div class="feedback-card"><strong>${data.tipo}</strong><br>${data.mensagem}</div>`;
         });
     });
 }
@@ -332,56 +388,71 @@ window.verMapaAdmin = (lat, lng) => {
     setTimeout(() => Maps.focarNoOnibus(lat, lng), 300);
 };
 
+window.notificarGeral = async () => {
+    const { value: formValues } = await Swal.fire({
+        title: 'Enviar Notificação',
+        html: '<input id="swal-input1" class="swal2-input" placeholder="Título"><input id="swal-input2" class="swal2-input" placeholder="Mensagem">',
+        focusConfirm: false,
+        preConfirm: () => [document.getElementById('swal-input1').value, document.getElementById('swal-input2').value]
+    });
+    if (formValues) {
+        await addDoc(collection(db, "avisos"), { titulo: formValues[0], mensagem: formValues[1], ativo: true, timestamp: serverTimestamp() });
+        UI.toast('Enviado!');
+    }
+};
+
+// === ESCALAS (MOTORISTA) ===
+window.carregarEscalaMotorista = async () => {
+    UI.showLoading();
+    const q = query(collection(db, 'escalas'), where("matricula", "==", estado.usuario.matricula));
+    const snap = await getDocs(q);
+    const div = document.getElementById('escalaConteudo');
+    if(snap.empty) div.innerHTML = '<div class="empty-state">Sem escala.</div>';
+    else {
+        const d = snap.docs[0].data();
+        let html = `<div class="escala-card"><h4>${d.periodo}</h4>`;
+        d.dias.forEach(dia => html += `<div class="dia-escala"><strong>${dia.dia}</strong>: ${dia.rota} (${dia.horario})</div>`);
+        html += '</div>';
+        div.innerHTML = html;
+    }
+    UI.hideLoading();
+    UI.mostrarTela('tela-escala');
+};
+
+// === FEEDBACK ===
+window.abrirFeedback = (p) => { estado.perfilFeedback = p; UI.mostrarTela('tela-feedback'); };
+window.cancelarFeedback = () => UI.mostrarTela(estado.perfilFeedback === 'motorista' ? 'tela-motorista' : 'tela-passageiro');
+window.enviarFeedbackReal = async () => {
+    const msg = document.getElementById('feedbackMsg').value;
+    const tipo = document.getElementById('feedbackTipo').value;
+    if(msg) {
+        await addDoc(collection(db, 'feedbacks'), { mensagem: msg, tipo, autor: estado.usuario.nome, timestamp: serverTimestamp(), status: 'pendente' });
+        UI.toast('Enviado!'); window.cancelarFeedback();
+    }
+};
+
 // === PASSAGEIRO ===
 window.iniciarModoPassageiro = () => {
     UI.mostrarTela('tela-rotas-passageiro');
     const div = document.getElementById('rotasPassageiroContainer');
-    
-    onSnapshot(collection(db, "rotas_em_andamento"), snap => {
+    monitorarRotas(rotas => {
         div.innerHTML = '';
-        const ativos = [];
-        snap.forEach(d => { if(d.data().ativo) ativos.push({id: d.id, ...d.data()}) });
-
-        if(ativos.length === 0) {
-            div.innerHTML = '<div class="empty-state"><p>Sem ônibus ativos.</p></div>';
-            return;
-        }
-
-        ativos.forEach(bus => {
-            Maps.atualizarMarcadorMotorista(bus.id, bus);
+        if(rotas.length === 0) { div.innerHTML = '<div class="empty-state">Nenhum ônibus ativo.</div>'; return; }
+        rotas.forEach(r => {
+            Maps.atualizarMarcadorMotorista(r.id, r);
             const el = document.createElement('div');
             el.className = 'rota-passageiro-card';
             el.innerHTML = `
-                <div class="rota-passageiro-header"><h4>${bus.rota}</h4><span class="status-online">Ao Vivo</span></div>
-                <p>${bus.motorista}</p>
+                <div class="rota-passageiro-header"><h4>${r.rota}</h4><span class="status-online">VIVO</span></div>
+                <p>${r.motorista} (${r.onibus})</p>
                 <button class="btn btn-primary btn-block">Ver no Mapa</button>
             `;
-            el.querySelector('button').onclick = () => {
-                Maps.abrirMapa();
-                Maps.focarNoOnibus(bus.latitude, bus.longitude);
-            };
+            el.querySelector('button').onclick = () => { Maps.abrirMapa(); Maps.focarNoOnibus(r.latitude, r.longitude); };
             div.appendChild(el);
         });
     });
 };
 
-// OUTRAS FUNÇÕES AUXILIARES
+// EXTRAS
 window.verFormsControle = () => window.open('https://forms.gle/UDniKxPqcMKGUhFQA', '_blank');
 window.abrirSuporteWhatsApp = () => window.open('https://wa.me/5593992059914', '_blank');
-window.mostrarAvisos = async () => {
-    const snap = await getDocs(collection(db, 'avisos'));
-    if(snap.empty) return UI.alert('Avisos', 'Nenhum aviso no momento.');
-    let msg = '';
-    snap.forEach(d => msg += `• ${d.data().mensagem}\n\n`);
-    UI.alert('Avisos', msg);
-};
-
-window.abrirFeedback = (p) => { estado.perfilFeedback = p; UI.mostrarTela('tela-feedback'); };
-window.cancelarFeedback = () => UI.mostrarTela(estado.usuario ? (estado.usuario.perfil === 'motorista' ? 'tela-motorista' : 'tela-passageiro') : 'telaEscolhaPerfil');
-window.enviarFeedbackReal = async () => {
-    const msg = document.getElementById('feedbackMsg').value;
-    if(msg) {
-        await addDoc(collection(db, "feedbacks"), { mensagem: msg, perfil: estado.perfilFeedback, timestamp: serverTimestamp() });
-        UI.toast('Enviado!'); window.cancelarFeedback();
-    }
-};
