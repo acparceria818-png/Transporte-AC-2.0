@@ -1,5 +1,5 @@
 // modules/notifications.js - GERENCIAMENTO DE NOTIFICAÇÕES
-import { db, collection, onSnapshot, query, where } from '../firebase.js';
+import { db, collection, onSnapshot, query, where, addDoc } from '../firebase.js';
 import { mostrarNotificacao } from './ui.js';
 
 export function initNotifications() {
@@ -31,8 +31,8 @@ function solicitarPermissaoNotificacoes() {
 export function criarNotificacao(titulo, mensagem, options = {}) {
   const defaultOptions = {
     body: mensagem,
-    icon: '/logo.jpg',
-    badge: '/logo.jpg',
+    icon: './logo.jpg',
+    badge: './logo.jpg',
     tag: 'ac-transporte',
     requireInteraction: false,
     ...options
@@ -89,17 +89,7 @@ function mostrarNotificacaoAviso(aviso) {
     `📢 ${aviso.titulo}`,
     aviso.mensagem,
     {
-      requireInteraction: true,
-      actions: [
-        {
-          action: 'ver',
-          title: 'Ver Detalhes'
-        },
-        {
-          action: 'fechar',
-          title: 'Fechar'
-        }
-      ]
+      requireInteraction: true
     }
   );
 }
@@ -132,16 +122,10 @@ export function enviarNotificacaoPush(titulo, mensagem, data = {}) {
   navigator.serviceWorker.ready.then((registration) => {
     registration.showNotification(titulo, {
       body: mensagem,
-      icon: '/logo.jpg',
-      badge: '/logo.jpg',
+      icon: './logo.jpg',
+      badge: './logo.jpg',
       data: data,
-      vibrate: [200, 100, 200],
-      actions: [
-        {
-          action: 'ver',
-          title: 'Ver'
-        }
-      ]
+      vibrate: [200, 100, 200]
     });
   });
 }
