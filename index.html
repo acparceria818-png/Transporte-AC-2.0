@@ -2,7 +2,8 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Portal de Transporte da AC Parceria e Terraplenagem">
   <meta name="theme-color" content="#b00000" />
   <title>AC Parceria - Portal de Transporte</title>
   
@@ -15,6 +16,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+  
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 
   <script type="module" src="firebase.js"></script>
@@ -32,7 +34,7 @@
 
 <header>
   <img src="Logo.jpg" alt="AC Logo" class="logo" loading="lazy" />
-  <h1>AC PARCERIA - Portal</h1>
+  <h1>AC PARCERIA E TERRAPLENAGEM — Portal de Transporte</h1>
   <div class="user-status" id="userStatus" style="display:none">
     <span id="userName"></span>
     <button class="logout-btn" id="logoutBtn" title="Sair">
@@ -46,6 +48,7 @@
     <button class="icon-btn" id="installBtn" style="display:none"><i class="fas fa-download"></i> Instalar</button>
   </div>
   <div>
+    <button class="icon-btn" id="darkToggle"><i class="fas fa-moon"></i></button>
     <span class="connection-status" id="connectionStatus"><i class="fas fa-circle"></i></span>
   </div>
 </div>
@@ -56,8 +59,14 @@
     <div class="welcome-content">
       <img src="avatar.png" class="avatar" alt="Avatar AC" />
       <div class="welcome-text">
-        <h2><i class="fas fa-bus"></i> Bem-vindo ao Portal</h2>
-        <p>Acesse rotas e monitoramento em tempo real.</p>
+        <h2><i class="fas fa-bus"></i> Bem-vindo ao Portal de Transporte</h2>
+        <p>Rotas, registro de entrada/saída e avisos oficiais.</p>
+        <div class="alert-card">
+          <div class="alert-icon"><i class="fas fa-clock"></i></div>
+          <div class="alert-content">
+            <strong>Importante:</strong> Preencha o formulário de controle 2× ao dia.
+          </div>
+        </div>
         <button class="btn btn-primary btn-large" id="btnEntrarPortal">
           <i class="fas fa-sign-in-alt"></i> Entrar no Portal
         </button>
@@ -67,84 +76,65 @@
 
   <section id="telaEscolhaPerfil" class="tela hidden">
     <div class="section-header">
-      <h2><i class="fas fa-user-circle"></i> Acesso</h2>
-      <p>Selecione seu perfil</p>
+      <h2><i class="fas fa-user-circle"></i> Como você está acessando?</h2>
     </div>
-    
     <div class="cards-grid">
       <div class="profile-card" id="cardMotorista">
         <div class="card-icon motorista"><i class="fas fa-bus"></i></div>
         <h3>Motorista</h3>
-        <p>Iniciar rotas e GPS</p>
+        <p>Acesso para condução</p>
       </div>
-      
       <div class="profile-card" id="cardPassageiro">
         <div class="card-icon passageiro"><i class="fas fa-users"></i></div>
         <h3>Passageiro</h3>
-        <p>Acompanhar ônibus</p>
+        <p>Acompanhar rota</p>
       </div>
-      
       <div class="profile-card" id="cardAdmin">
         <div class="card-icon admin"><i class="fas fa-cogs"></i></div>
         <h3>Administrador</h3>
-        <p>Gestão do sistema</p>
+        <p>Gestão e controle</p>
       </div>
     </div>
-    
     <div class="action-footer">
-      <button class="btn btn-secondary" id="btnVoltarWelcome">
-        <i class="fas fa-arrow-left"></i> Voltar
-      </button>
+      <button class="btn btn-secondary" id="btnVoltarWelcome"><i class="fas fa-arrow-left"></i> Voltar</button>
     </div>
   </section>
 
   <section id="tela-motorista-login" class="tela hidden">
     <div class="section-header">
-      <h2><i class="fas fa-id-card"></i> Login Motorista</h2>
+      <h2><i class="fas fa-bus"></i> Login do Motorista</h2>
     </div>
-    
     <div class="auth-card">
-      <div class="auth-icon"><i class="fas fa-user-tie"></i></div>
+      <div class="auth-icon"><i class="fas fa-id-card"></i></div>
       <div class="form-group">
         <label>Matrícula</label>
-        <input id="matriculaMotorista" type="text" class="form-input" placeholder="Ex: AC1234">
+        <input id="matriculaMotorista" type="text" class="form-input" placeholder="Digite sua matrícula">
       </div>
-      <button class="btn btn-primary btn-block" id="btnLoginMotorista">
-        <i class="fas fa-sign-in-alt"></i> Entrar
-      </button>
+      <button class="btn btn-primary btn-block" id="btnLoginMotorista">Entrar</button>
     </div>
-    
     <div class="action-footer">
-      <button class="btn btn-secondary" id="btnVoltarPerfil">
-        <i class="fas fa-arrow-left"></i> Voltar
-      </button>
+      <button class="btn btn-secondary" id="btnVoltarPerfil"><i class="fas fa-arrow-left"></i> Voltar</button>
     </div>
   </section>
 
   <section id="tela-admin-login" class="tela hidden">
     <div class="section-header">
-      <h2><i class="fas fa-shield-alt"></i> Login Admin</h2>
+      <h2><i class="fas fa-shield-alt"></i> Acesso Administrativo</h2>
     </div>
-    
     <div class="auth-card">
       <div class="auth-icon admin"><i class="fas fa-lock"></i></div>
       <div class="form-group">
         <label>E-mail</label>
-        <input id="adminEmail" type="email" class="form-input" placeholder="admin@acparceria.com">
+        <input id="adminEmail" type="email" class="form-input" placeholder="seu@email.com">
       </div>
       <div class="form-group">
         <label>Senha</label>
-        <input id="adminSenha" type="password" class="form-input" placeholder="******">
+        <input id="adminSenha" type="password" class="form-input" placeholder="Sua senha">
       </div>
-      <button class="btn btn-primary btn-block" id="btnLoginAdmin">
-        <i class="fas fa-sign-in-alt"></i> Entrar
-      </button>
+      <button class="btn btn-primary btn-block" id="btnLoginAdmin">Entrar</button>
     </div>
-    
     <div class="action-footer">
-      <button class="btn btn-secondary" id="btnVoltarPerfilAdmin">
-        <i class="fas fa-arrow-left"></i> Voltar
-      </button>
+      <button class="btn btn-secondary" id="btnVoltarPerfilAdmin"><i class="fas fa-arrow-left"></i> Voltar</button>
     </div>
   </section>
 
@@ -152,103 +142,68 @@
     <div class="user-header">
       <div class="user-avatar"><i class="fas fa-user-circle"></i></div>
       <div class="user-info">
-        <h2>Olá, <span id="motoristaNomeDisplay">Motorista</span>!</h2>
+        <h2>Olá, <span id="motoristaNomeDisplay"></span>!</h2>
         <div class="user-details">
-            <span class="user-badge"><i class="fas fa-id-card"></i> <span id="motoristaMatriculaDisplay"></span></span>
+          <span class="user-badge"><i class="fas fa-id-card"></i> <span id="motoristaMatriculaDisplay"></span></span>
         </div>
       </div>
     </div>
 
     <div class="status-card">
-      <div class="status-header">
-        <i class="fas fa-route"></i> <h3>Status da Rota</h3>
-      </div>
+      <div class="status-header"><i class="fas fa-route"></i> <h3>Status da Rota</h3></div>
       <div class="status-content">
         <p id="rotaStatusTexto">Nenhuma rota ativa</p>
-        <button class="btn btn-danger" id="btnPararRota" style="display:none">
-          <i class="fas fa-stop"></i> Parar GPS
-        </button>
+        <button class="btn btn-danger" id="btnPararRota" style="display:none"><i class="fas fa-stop"></i> Parar Rota</button>
       </div>
     </div>
 
     <div class="cards-grid">
       <div class="feature-card" id="btnIrParaRotas">
         <div class="card-icon primary"><i class="fas fa-route"></i></div>
-        <h3>Iniciar Rota</h3>
-        <p>Selecione seu trajeto</p>
+        <h3>Selecionar Rota</h3>
       </div>
-      
       <div class="feature-card emergency" id="btnEmergencia">
         <div class="card-icon danger"><i class="fas fa-exclamation-triangle"></i></div>
         <h3>EMERGÊNCIA</h3>
-        <p>Botão de Pânico</p>
+      </div>
+      <div class="feature-card whatsapp" onclick="window.open('https://wa.me/5593992059914', '_blank')">
+        <div class="card-icon"><i class="fab fa-whatsapp"></i></div>
+        <h3>Suporte WhatsApp</h3>
       </div>
     </div>
   </section>
 
   <section id="tela-rotas" class="tela hidden">
-    <div class="section-header">
-      <h2><i class="fas fa-map-signs"></i> Selecionar Rota</h2>
-    </div>
-    <div id="listaRotas" class="routes-container">
-      </div>
+    <div class="section-header"><h2><i class="fas fa-route"></i> Rotas Disponíveis</h2></div>
+    <div id="listaRotas" class="routes-container"></div>
     <div class="action-footer">
-      <button class="btn btn-secondary" id="btnVoltarMotorista">Voltar</button>
+      <button class="btn btn-secondary" id="btnVoltarMotorista">Voltar ao Menu</button>
     </div>
   </section>
 
   <section id="tela-passageiro" class="tela hidden">
-    <div class="section-header">
-      <h2><i class="fas fa-map-marked-alt"></i> Monitoramento</h2>
-      <p>Ônibus em tempo real</p>
-    </div>
-    
+    <div class="section-header"><h2><i class="fas fa-users"></i> Passageiro</h2></div>
     <div class="rotas-ativas-section">
-      <h3>Rotas Ativas Agora</h3>
+      <h3><i class="fas fa-bus"></i> Rotas Ativas Agora</h3>
       <div class="rotas-ativas-container" id="listaRotasAtivas">
-        <div class="loading-state">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>Buscando rotas...</p>
-        </div>
+        <div class="loading-state"><p>Buscando rotas...</p></div>
       </div>
     </div>
-
     <div class="action-footer">
       <button class="btn btn-secondary" id="btnVoltarPassageiro">Voltar</button>
     </div>
   </section>
 
   <section id="tela-admin-dashboard" class="tela hidden">
-    <div class="section-header">
-      <h2><i class="fas fa-tachometer-alt"></i> Painel Admin</h2>
-    </div>
-    
+    <div class="section-header"><h2><i class="fas fa-tachometer-alt"></i> Painel de Controle</h2></div>
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon primary"><i class="fas fa-bus"></i></div>
-        <div class="stat-content">
-          <h3 id="adminTotalRotas">0</h3>
-          <p>Rotas Ativas</p>
-        </div>
+        <div class="stat-content"><h3 id="adminTotalRotas">0</h3><p>Rotas Ativas</p></div>
       </div>
     </div>
-
-    <div class="admin-actions">
-        <h4>Ações Rápidas</h4>
-        <div class="actions-grid">
-            <div class="admin-action-card" onclick="alert('Funcionalidade em desenvolvimento')">
-                <div class="admin-action-icon"><i class="fas fa-users"></i></div>
-                <h4>Gerenciar Motoristas</h4>
-            </div>
-            <div class="admin-action-card" onclick="alert('Funcionalidade em desenvolvimento')">
-                <div class="admin-action-icon"><i class="fas fa-plus-circle"></i></div>
-                <h4>Criar Rota</h4>
-            </div>
-        </div>
-    </div>
-
     <div class="action-footer">
-        <button class="btn btn-secondary" onclick="logout()">Sair</button>
+      <button class="btn btn-secondary" id="logoutBtnAdmin">Sair</button>
     </div>
   </section>
 
