@@ -1,8 +1,8 @@
-// modules/ui.js
-import Swal from 'https://cdn.jsdelivr.net/npm/sweetalert2@11/src/sweetalert2.js';
+// ui.js - Funções de interface do usuário
+import { estadoApp } from './config.js';
 
-// Estado global
-export let estadoApp = window.estadoApp || {};
+// SweetAlert2 para modais profissionais
+import Swal from 'https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js';
 
 export function mostrarTela(id) {
   console.log('🔄 Mostrando tela:', id);
@@ -21,6 +21,28 @@ export function mostrarTela(id) {
   alvo.classList.remove('hidden');
   alvo.classList.add('ativa');
   
+  switch(id) {
+    case 'tela-rotas':
+      setTimeout(() => carregarRotas(), 100);
+      break;
+    case 'tela-passageiro':
+      iniciarMonitoramentoPassageiro();
+      break;
+    case 'tela-admin-dashboard':
+      iniciarMonitoramentoAdmin();
+      break;
+    case 'tela-motorista':
+      atualizarInfoMotorista();
+      break;
+    case 'tela-rotas-passageiro':
+      carregarRotasPassageiro();
+      break;
+    case 'tela-relatorios':
+      carregarRelatorios();
+      atualizarListaOnlineUsers();
+      break;
+  }
+  
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -38,175 +60,220 @@ export function hideLoading() {
 }
 
 export function mostrarNotificacao(titulo, mensagem, tipo = 'info') {
-  // SweetAlert2 para modais
-  if (tipo === 'confirm') {
-    return Swal.fire({
-      title: titulo,
-      text: mensagem,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: '#b00000',
-      cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Sim',
-      cancelButtonText: 'Cancelar'
+  // SweetAlert2 para notificações
+  const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 3000,
+    timerProgressBar: true,
+    didOpen: (toast) => {
+      toast.addEventListener('mouseenter', Swal.stopTimer);
+      toast.addEventListener('mouseleave', Swal.resumeTimer);
+    }
+  });
+
+  Toast.fire({
+    icon: tipo,
+    title: titulo,
+    text: mensagem
+  });
+
+  // Também mostrar notificação do navegador se permitido
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(titulo, {
+      body: mensagem,
+      icon: 'logo.jpg'
     });
   }
+}
 
-  // Toastify para notificações rápidas
-  if (typeof Toastify !== 'undefined') {
-    Toastify({
-      text: `${titulo}: ${mensagem}`,
-      duration: 3000,
-      gravity: 'top',
-      position: 'right',
-      backgroundColor: tipo === 'error' ? '#e74c3c' : 
-                     tipo === 'success' ? '#27ae60' : 
-                     tipo === 'warning' ? '#f39c12' : '#3498db',
-      stopOnFocus: true
-    }).showToast();
-  } else {
-    // Fallback para notificação nativa
-    criarNotificacaoTela(titulo, mensagem, tipo);
+export function mostrarConfirmacao(titulo, texto, tipo = 'question') {
+  return Swal.fire({
+    title: titulo,
+    text: texto,
+    icon: tipo,
+    showCancelButton: true,
+    confirmButtonText: 'Sim',
+    cancelButtonText: 'Não',
+    confirmButtonColor: '#b00000',
+    cancelButtonColor: '#6c757d'
+  });
+}
+
+export function mostrarInput(titulo, texto, placeholder = '', tipo = 'text') {
+  return Swal.fire({
+    title: titulo,
+    text: texto,
+    input: tipo,
+    inputPlaceholder: placeholder,
+    showCancelButton: true,
+    confirmButtonText: 'Confirmar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#b00000',
+    showLoaderOnConfirm: true,
+    preConfirm: (value) => {
+      if (!value) {
+        Swal.showValidationMessage('Por favor, preencha este campo');
+      }
+      return value;
+    }
+  });
+}
+
+// Funções de tema
+export function initDarkMode() {
+  const darkToggle = document.getElementById('darkToggle');
+  if (!darkToggle) return;
+  
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+  const savedPreference = localStorage.getItem('ac_dark');
+  
+  if (savedPreference === '1' || (!savedPreference && prefersDark.matches)) {
+    document.body.classList.add('dark');
+    updateDarkModeIcon(true);
+  }
+  
+  darkToggle.addEventListener('click', toggleDarkMode);
+  
+  prefersDark.addEventListener('change', (e) => {
+    if (!localStorage.getItem('ac_dark')) {
+      if (e.matches) {
+        document.body.classList.add('dark');
+        updateDarkModeIcon(true);
+      } else {
+        document.body.classList.remove('dark');
+        updateDarkModeIcon(false);
+      }
+    }
+  });
+}
+
+function toggleDarkMode() {
+  const isDark = document.body.classList.toggle('dark');
+  localStorage.setItem('ac_dark', isDark ? '1' : '0');
+  updateDarkModeIcon(isDark);
+  
+  const darkToggle = document.getElementById('darkToggle');
+  if (darkToggle) {
+    darkToggle.style.transform = 'scale(0.95)';
+    setTimeout(() => {
+      darkToggle.style.transform = '';
+    }, 150);
   }
 }
 
-function criarNotificacaoTela(titulo, mensagem, tipo) {
-  const notificacao = document.createElement('div');
-  notificacao.className = `notificacao-tela notificacao-${tipo}`;
-  notificacao.innerHTML = `
-    <div class="notificacao-conteudo">
-      <strong>${titulo}</strong>
-      <p>${mensagem}</p>
-    </div>
-    <button onclick="this.parentElement.remove()">✕</button>
-  `;
+function updateDarkModeIcon(isDark) {
+  const darkToggle = document.getElementById('darkToggle');
+  if (!darkToggle) return;
   
-  document.body.appendChild(notificacao);
+  darkToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+  darkToggle.setAttribute('title', isDark ? 'Alternar para modo claro' : 'Alternar para modo escuro');
+}
+
+// PWA
+export function initPWA() {
+  const installBtn = document.getElementById('installBtn');
+  if (!installBtn) return;
   
-  setTimeout(() => {
-    if (notificacao.parentElement) {
-      notificacao.remove();
+  let deferredPrompt;
+  
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.style.display = 'flex';
+    console.log('📱 PWA pode ser instalado');
+  });
+  
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) {
+      mostrarNotificacao('Info', 'Este aplicativo já está instalado ou não pode ser instalado.', 'info');
+      return;
     }
-  }, 5000);
+    
+    deferredPrompt.prompt();
+    const choiceResult = await deferredPrompt.userChoice;
+    
+    if (choiceResult.outcome === 'accepted') {
+      console.log('✅ Usuário aceitou a instalação');
+      installBtn.style.display = 'none';
+      mostrarNotificacao('Sucesso', 'Aplicativo instalado com sucesso!', 'success');
+    } else {
+      console.log('❌ Usuário recusou a instalação');
+      mostrarNotificacao('Info', 'Instalação cancelada.', 'info');
+    }
+    
+    deferredPrompt = null;
+  });
+  
+  window.addEventListener('appinstalled', () => {
+    console.log('🎉 PWA instalado com sucesso');
+    installBtn.style.display = 'none';
+  });
+  
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    installBtn.style.display = 'none';
+  }
 }
 
-export function adicionarRodape() {
-  const footer = document.createElement('footer');
-  footer.className = 'footer-dev';
-  footer.innerHTML = `
-    <div class="footer-content">
-      <span>Desenvolvido por Juan Sales</span>
-      <div class="footer-contacts">
-        <a href="tel:+5594992233753"><i class="fas fa-phone"></i> (94) 99223-3753</a>
-        <a href="mailto:Juansalesadm@gmail.com"><i class="fas fa-envelope"></i> Juansalesadm@gmail.com</a>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(footer);
-}
-
-export function atualizarInfoOnibus() {
-  if (!estadoApp.motorista || !estadoApp.onibusAtivo) return;
-  
-  const userTags = document.querySelector('.user-tags');
-  if (!userTags) return;
-  
-  userTags.innerHTML = `
-    <span class="user-tag"><i class="fas fa-bus"></i> ${estadoApp.onibusAtivo.placa}</span>
-    <span class="user-tag"><i class="fas fa-tag"></i> ${estadoApp.onibusAtivo.tag_ac}</span>
-    <span class="user-tag"><i class="fas fa-id-card"></i> ${estadoApp.onibusAtivo.tag_vale}</span>
-  `;
-}
-
-export function updateUserStatus(nome, matricula) {
-  const userStatus = document.getElementById('userStatus');
-  const userName = document.getElementById('userName');
-  const motoristaNome = document.getElementById('motoristaNome');
-  const motoristaMatricula = document.getElementById('motoristaMatricula');
-  
-  if (userStatus) userStatus.style.display = 'flex';
-  if (userName) userName.textContent = nome;
-  if (motoristaNome) motoristaNome.textContent = nome;
-  if (motoristaMatricula) motoristaMatricula.textContent = matricula;
-  
-  atualizarInfoOnibus();
-}
-
-// Skeleton Loading
+// Skeleton loading
 export function showSkeleton(containerId, count = 3) {
   const container = document.getElementById(containerId);
   if (!container) return;
   
-  let skeletonHTML = '';
-  for (let i = 0; i < count; i++) {
-    skeletonHTML += `
-      <div class="skeleton-card">
-        <div class="skeleton skeleton-title"></div>
-        <div class="skeleton skeleton-text"></div>
-        <div class="skeleton skeleton-text"></div>
-      </div>
-    `;
-  }
+  const skeletonHTML = `
+    <div class="skeleton-container">
+      ${Array(count).fill(0).map(() => `
+        <div class="skeleton-card">
+          <div class="skeleton-line" style="width: 70%; height: 20px;"></div>
+          <div class="skeleton-line" style="width: 50%; height: 16px;"></div>
+          <div class="skeleton-line" style="width: 30%; height: 14px;"></div>
+        </div>
+      `).join('')}
+    </div>
+  `;
   
   container.innerHTML = skeletonHTML;
 }
 
-// Adicionar CSS para skeleton
-const skeletonCSS = `
-.skeleton-card {
-  background: #f0f0f0;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 12px;
-  animation: pulse 1.5s infinite;
-}
-
-.skeleton {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: 4px;
-}
-
-.skeleton-title {
-  height: 20px;
-  width: 60%;
-  margin-bottom: 12px;
-}
-
-.skeleton-text {
-  height: 12px;
-  width: 90%;
-  margin-bottom: 8px;
-}
-
-.skeleton-text:last-child {
-  width: 70%;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-body.dark .skeleton-card {
-  background: #2d2d44;
-}
-
-body.dark .skeleton {
-  background: linear-gradient(90deg, #2d2d44 25%, #3d3d5a 50%, #2d2d44 75%);
-}
+// Adicionar estilos de skeleton dinamicamente
+const skeletonStyles = `
+  .skeleton-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .skeleton-card {
+    background: #f0f0f0;
+    border-radius: 8px;
+    padding: 16px;
+    animation: pulse 1.5s infinite;
+  }
+  
+  .skeleton-line {
+    background: #e0e0e0;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  body.dark .skeleton-card {
+    background: #2d2d44;
+  }
+  
+  body.dark .skeleton-line {
+    background: #3d3d5a;
+  }
 `;
 
-// Adicionar CSS ao documento
-if (!document.querySelector('#skeleton-css')) {
-  const style = document.createElement('style');
-  style.id = 'skeleton-css';
-  style.textContent = skeletonCSS;
-  document.head.appendChild(style);
-}
+const styleSheet = document.createElement("style");
+styleSheet.textContent = skeletonStyles;
+document.head.appendChild(styleSheet);
+
+// Exportar funções para uso global
+window.mostrarTela = mostrarTela;
