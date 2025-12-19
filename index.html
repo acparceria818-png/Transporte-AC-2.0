@@ -3,12 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#b00000" />
   <title>AC Parceria - Portal de Transporte</title>
   
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.jpg" type="image/jpg">
-  <link rel="stylesheet" href="styles.css">
   
+  <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
@@ -33,24 +34,32 @@
 </header>
 
 <div class="top-actions container">
-  <div><button class="icon-btn" id="installBtn" style="display:none"><i class="fas fa-download"></i> App</button></div>
-  <div><span class="connection-status" id="connectionStatus"><i class="fas fa-circle"></i></span></div>
+  <div><button class="icon-btn" id="installBtn" style="display:none"><i class="fas fa-download"></i> Instalar App</button></div>
+  <div>
+    <button class="icon-btn" id="darkToggle"><i class="fas fa-moon"></i></button>
+    <span class="connection-status" id="connectionStatus"><i class="fas fa-circle"></i></span>
+  </div>
 </div>
 
 <main class="container">
+
   <section id="welcome" class="tela ativa">
     <div class="welcome-content">
       <img src="avatar.png" class="avatar" alt="Avatar" />
       <div class="welcome-text">
         <h2>Bem-vindo ao Portal</h2>
-        <p>Rotas e monitoramento oficial.</p>
-        <button class="btn btn-primary btn-large" onclick="window.entrarNoPortal()">Entrar</button>
+        <p>Rotas, registro de entrada/saída e avisos oficiais.</p>
+        <div class="alert-card">
+          <div class="alert-icon"><i class="fas fa-clock"></i></div>
+          <div class="alert-content"><strong>Importante:</strong> Preencher formulário na entrada e saída.</div>
+        </div>
+        <button class="btn btn-primary btn-large" onclick="window.entrarNoPortal()">Entrar no Portal</button>
       </div>
     </div>
   </section>
 
   <section id="telaEscolhaPerfil" class="tela hidden">
-    <div class="section-header"><h2>Acesso</h2></div>
+    <div class="section-header"><h2>Acesso</h2><p>Selecione seu perfil</p></div>
     <div class="cards-grid">
       <div class="profile-card" onclick="window.selecionarPerfil('motorista')">
         <div class="card-icon motorista"><i class="fas fa-bus"></i></div><h3>Motorista</h3>
@@ -59,7 +68,7 @@
         <div class="card-icon passageiro"><i class="fas fa-users"></i></div><h3>Passageiro</h3>
       </div>
       <div class="profile-card" onclick="window.selecionarPerfil('admin')">
-        <div class="card-icon admin"><i class="fas fa-cogs"></i></div><h3>Admin</h3>
+        <div class="card-icon admin"><i class="fas fa-cogs"></i></div><h3>Administrador</h3>
       </div>
     </div>
     <div class="action-footer"><button class="btn btn-secondary" onclick="window.mostrarTela('welcome')">Voltar</button></div>
@@ -68,8 +77,11 @@
   <section id="tela-motorista-login" class="tela hidden">
     <div class="section-header"><h2>Login Motorista</h2></div>
     <div class="auth-card">
-      <input id="matriculaMotorista" type="text" class="form-input" placeholder="Matrícula (Ex: AC1234)">
-      <button class="btn btn-primary btn-block mt-2" onclick="window.confirmarMatriculaMotorista()">Entrar</button>
+      <div class="form-group">
+        <label>Matrícula</label>
+        <input id="matriculaMotorista" type="text" class="form-input" placeholder="Ex: AC1234">
+      </div>
+      <button class="btn btn-primary btn-block" onclick="window.confirmarMatriculaMotorista()">Entrar</button>
     </div>
     <div class="action-footer"><button class="btn btn-secondary" onclick="window.mostrarTela('telaEscolhaPerfil')">Voltar</button></div>
   </section>
@@ -85,6 +97,7 @@
       <div class="user-info">
         <h2>Olá, <span id="motoristaNomeDisplay"></span>!</h2>
         <small id="motoristaOnibusDisplay"></small>
+        <div class="user-tags"></div>
       </div>
     </div>
     <div class="status-card">
@@ -97,7 +110,7 @@
         <div class="card-icon primary"><i class="fas fa-route"></i></div><h3>Iniciar Rota</h3>
       </div>
       <div class="feature-card warning" onclick="window.mostrarAvisos()">
-        <div class="card-icon warning"><i class="fas fa-bullhorn"></i></div><h3>Avisos</h3>
+        <div class="card-icon warning"><i class="fas fa-bullhorn"></i></div><h3>Avisos <span class="badge" id="avisosCount" style="display:none">0</span></h3>
       </div>
       <div class="feature-card info" onclick="window.verFormsControle()">
         <div class="card-icon info"><i class="fas fa-clipboard-check"></i></div><h3>Controle</h3>
@@ -158,7 +171,10 @@
   <section id="tela-admin-dashboard" class="tela hidden">
     <div class="section-header"><h2>Painel Admin</h2></div>
     <div class="stats-grid">
-        <div class="stat-card"><h3 id="adminTotalRotas">0</h3><p>Ativos</p></div>
+      <div class="stat-card">
+        <div class="stat-icon primary"><i class="fas fa-bus"></i></div>
+        <div class="stat-content"><h3 id="adminTotalRotas">0</h3><p>Ativos</p></div>
+      </div>
     </div>
     
     <div class="dashboard-tabs">
@@ -176,15 +192,16 @@
             <div class="feature-card" onclick="window.gerenciarAvisos()"><h3>Gerenciar Avisos</h3></div>
             <div class="feature-card" onclick="window.gerenciarEscalas()"><h3>Gerenciar Escalas</h3></div>
             <div class="feature-card" onclick="window.mostrarTela('tela-relatorios')"><h3>Relatórios</h3></div>
-            <div class="feature-card" onclick="window.notificarGeral()"><h3>Enviar Notificação</h3></div>
+            <div class="feature-card" onclick="window.notificarGeral()"><h3>Notificação Push</h3></div>
         </div>
     </div>
+
     <div class="action-footer"><button class="btn btn-secondary" onclick="window.logout()">Sair</button></div>
   </section>
 
   <section id="tela-escala" class="tela hidden">
     <div class="section-header"><h2>Minha Escala</h2></div>
-    <div id="escalaConteudo"></div>
+    <div class="escala-dias" id="escalaConteudo"></div>
     <div class="action-footer"><button class="btn btn-secondary" onclick="window.mostrarTela('tela-motorista')">Voltar</button></div>
   </section>
 
