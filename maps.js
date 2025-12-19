@@ -1,14 +1,19 @@
 // maps.js
+import { UI } from './ui.js';
+
 let map = null;
 let markers = {};
-let polylines = {}; // Guarda as linhas de trajeto
+let polylines = {}; // Guarda o histórico do trajeto
 let wakeLock = null;
 
 export const Maps = {
   init: () => {
     if (map) return;
     map = L.map('map').setView([-14.235, -51.925], 4);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+    
     window.mapInstance = map;
   },
 
@@ -24,20 +29,22 @@ export const Maps = {
   atualizarMarcadorMotorista: (id, dados) => {
     const { latitude, longitude, motorista, onibus, rota } = dados;
     
-    // 1. Marcador (Ônibus)
+    // Marcador
     if (markers[id]) {
       markers[id].setLatLng([latitude, longitude]);
       markers[id].setPopupContent(`<b>${rota}</b><br>${motorista}<br>${onibus}`);
     } else {
-      const icon = L.divIcon({
+      const busIcon = L.divIcon({
         html: '<i class="fas fa-bus" style="font-size:24px;color:#b00000;text-shadow:1px 1px 2px white"></i>',
-        className: 'custom-icon', iconSize: [30, 30]
+        className: 'custom-bus-icon',
+        iconSize: [30, 30], iconAnchor: [15, 15]
       });
-      markers[id] = L.marker([latitude, longitude], { icon }).addTo(map)
+      markers[id] = L.marker([latitude, longitude], { icon: busIcon })
+        .addTo(map)
         .bindPopup(`<b>${rota}</b><br>${motorista}<br>${onibus}`);
     }
 
-    // 2. Rastro (Polyline) - HISTÓRICO VISUAL
+    // Rastro (Polyline)
     if (!polylines[id]) {
       polylines[id] = L.polyline([], { color: 'blue', weight: 4 }).addTo(map);
     }
@@ -49,7 +56,12 @@ export const Maps = {
   },
 
   ativarWakeLock: async () => {
-    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+    try { 
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        console.log('Wake Lock ativo');
+      }
+    } catch (e) { console.warn(e); }
   },
 
   desativarWakeLock: () => {
