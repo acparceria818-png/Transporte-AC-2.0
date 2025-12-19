@@ -8,17 +8,15 @@ export const Auth = {
     try {
       UI.showLoading('Validando...');
       let dados = null;
-      // Tenta ID direto
       const docSnap = await getDoc(doc(db, 'colaboradores', matricula));
       if (docSnap.exists()) dados = docSnap.data();
       else {
-        // Tenta query
         const qs = await getDocs(query(collection(db, 'colaboradores'), where("matricula", "==", matricula)));
         if (!qs.empty) dados = qs.docs[0].data();
       }
       UI.hideLoading();
-      if (!dados) { UI.alert('Erro', 'Não encontrado', 'error'); return null; }
-      if (dados.ativo === false) { UI.alert('Erro', 'Inativo', 'error'); return null; }
+      if (!dados || dados.ativo === false) { UI.alert('Erro', 'Acesso negado', 'error'); return null; }
+      
       const user = { nome: dados.nome, matricula: matricula, perfil: 'motorista' };
       localStorage.setItem('ac_user', JSON.stringify(user));
       return user;
