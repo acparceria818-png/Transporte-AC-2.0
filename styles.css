@@ -2992,14 +2992,13 @@ body.dark .rota-ativa-info {
     padding: 10px 14px;
   }
 }
-/* ========== ESTILOS PARA MAPA INTEGRADO ========== */
-.mapa-container {
-  width: 100%;
-  height: 400px;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  margin: var(--space-md) 0;
-  box-shadow: var(--shadow-sm);
+/* Adicione isso ao seu CSS existente para o Mapa e novos componentes */
+
+.mapa-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: white;
+  z-index: 9999;
 }
 
 #map {
@@ -3007,88 +3006,48 @@ body.dark .rota-ativa-info {
   height: 100%;
 }
 
-/* ========== ESTILOS PARA SWEETALERT2 ========== */
-.swal2-popup {
-  font-family: var(--font-family) !important;
+.btn-floating {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  background: white;
+  border: none;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  font-size: 20px;
+  color: #333;
+  cursor: pointer;
 }
 
-.swal2-title {
-  color: var(--secondary) !important;
-}
-
-.swal2-confirm {
-  background-color: var(--primary) !important;
-}
-
-/* ========== ESTILOS PARA TOASTS ========== */
-.toastify {
-  font-family: var(--font-family) !important;
-  border-radius: var(--radius-md) !important;
-  box-shadow: var(--shadow-lg) !important;
-}
-
-/* ========== ESTILOS PARA HISTÓRICO DE ROTA ========== */
-.historico-rota-container {
-  background: var(--white);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-  margin: var(--space-md) 0;
-  box-shadow: var(--shadow-sm);
-}
-
-.historico-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-md);
-}
-
-.historico-lista {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.historico-item {
-  padding: var(--space-sm);
-  border-bottom: 1px solid var(--gray-light);
+.route-item {
+  background: #fff;
+  border-left: 5px solid #b00000;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.historico-item:last-child {
-  border-bottom: none;
+.badge-live {
+  background: #e74c3c;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  animation: pulse 1.5s infinite;
 }
 
-.historico-hora {
-  color: var(--gray);
-  font-size: var(--font-size-sm);
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
 }
 
-.historico-coords {
-  font-family: monospace;
-  font-size: var(--font-size-sm);
-  color: var(--secondary);
-}
-
-.historico-distancia {
-  color: var(--primary);
-  font-weight: 600;
-}
-
-/* Modo escuro */
-body.dark .mapa-container {
-  background: #2d2d44;
-}
-
-body.dark .historico-rota-container {
-  background: #2d2d44;
-}
-
-body.dark .historico-item {
-  border-bottom-color: #3d3d5a;
-}
-
-body.dark .historico-coords {
-  color: #e0e0e0;
+.custom-bus-icon {
+  text-align: center;
 }
