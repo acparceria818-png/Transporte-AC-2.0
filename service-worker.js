@@ -1,183 +1,100 @@
-// service-worker.js - ATUALIZADO PARA BACKGROUND SYNC
-const CACHE_NAME = 'ac-transporte-v9' + new Date().getTime();
-const CORE_ASSETS = [
-  './',
-  './index.html',
-  './styles.css',
-  './app.js',
-  './firebase.js',
-  './modules/auth.js',
-  './modules/maps.js',
-  './modules/ui.js',
-  './modules/admin.js',
-  './modules/location.js',
-  './modules/database.js',
-  './modules/notifications.js',
-  './manifest.json',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
-];
-
-// Instalação
-self.addEventListener('install', event => {
-  console.log('📦 Service Worker: Instalando...');
-  
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(CORE_ASSETS))
-      .then(() => self.skipWaiting())
-  );
-});
-
-// Ativação
-self.addEventListener('activate', event => {
-  console.log('✅ Service Worker: Ativando...');
-  
-  event.waitUntil(
-    caches.keys()
-      .then(cacheNames => {
-        return Promise.all(
-          cacheNames.map(cache => {
-            if (cache !== CACHE_NAME) {
-              return caches.delete(cache);
-            }
-          })
-        );
-      })
-      .then(() => self.clients.claim())
-  );
-});
-
-// Fetch com background sync
-self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-  
-  // Ignorar requisições não GET
-  if (event.request.method !== 'GET') return;
-  
-  // Ignorar Firebase e analytics
-  if (url.hostname.includes('firebase') || 
-      url.hostname.includes('googleapis') ||
-      url.hostname.includes('google-analytics')) {
-    return;
-  }
-  
-  event.respondWith(
-    caches.match(event.request)
-      .then(cachedResponse => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        
-        return fetch(event.request)
-          .then(networkResponse => {
-            if (!networkResponse || networkResponse.status !== 200) {
-              return networkResponse;
-            }
-            
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                cache.put(event.request, responseToCache);
-              });
-            
-            return networkResponse;
-          })
-          .catch(() => {
-            if (event.request.mode === 'navigate') {
-              return caches.match('./index.html');
-            }
-            return new Response('Offline', { status: 503 });
-          });
-      })
-  );
-});
-
-// Background sync para localizações
-self.addEventListener('sync', event => {
-  if (event.tag === 'sync-locations') {
-    event.waitUntil(syncPendingLocations());
-  }
-});
-
-// Sincronizar localizações pendentes
-async function syncPendingLocations() {
-  const pendingLocations = await getPendingLocations();
-  
-  for (const location of pendingLocations) {
-    try {
-      // Enviar para Firebase
-      await sendLocationToFirebase(location);
-      // Remover do armazenamento local
-      await removePendingLocation(location.id);
-    } catch (error) {
-      console.error('Erro ao sincronizar localização:', error);
-    }
-  }
+/* ========== ESTILOS PARA MAPA INTEGRADO ========== */
+.mapa-container {
+  width: 100%;
+  height: 400px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin: var(--space-md) 0;
+  box-shadow: var(--shadow-sm);
 }
 
-// Periodic sync para manter ativo
-self.addEventListener('periodicsync', event => {
-  if (event.tag === 'location-sync') {
-    event.waitUntil(syncLocationData());
-  }
-});
-
-// Push notifications
-self.addEventListener('push', event => {
-  const options = {
-    body: event.data?.text() || 'Nova notificação do AC Transporte',
-    icon: './logo.jpg',
-    badge: './logo.jpg',
-    vibrate: [100, 50, 100],
-    data: {
-      url: './'
-    }
-  };
-  
-  event.waitUntil(
-    self.registration.showNotification('AC Transporte', options)
-  );
-});
-
-// Notification click
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  
-  event.waitUntil(
-    clients.matchAll({ type: 'window' })
-      .then(windowClients => {
-        for (let client of windowClients) {
-          if (client.url.includes('./') && 'focus' in client) {
-            return client.focus();
-          }
-        }
-        if (clients.openWindow) {
-          return clients.openWindow('./');
-        }
-      })
-  );
-});
-
-// Funções auxiliares para background sync
-async function getPendingLocations() {
-  // Implementar lógica para buscar localizações pendentes
-  return [];
+#map {
+  width: 100%;
+  height: 100%;
 }
 
-async function sendLocationToFirebase(location) {
-  // Implementar envio para Firebase
-  return Promise.resolve();
+/* ========== ESTILOS PARA SWEETALERT2 ========== */
+.swal2-popup {
+  font-family: var(--font-family) !important;
 }
 
-async function removePendingLocation(id) {
-  // Implementar remoção de localização pendente
-  return Promise.resolve();
+.swal2-title {
+  color: var(--secondary) !important;
 }
 
-async function syncLocationData() {
-  // Sincronizar dados de localização
-  console.log('🔄 Sincronizando dados de localização');
-  return Promise.resolve();
+.swal2-confirm {
+  background-color: var(--primary) !important;
+}
+
+/* ========== ESTILOS PARA TOASTS ========== */
+.toastify {
+  font-family: var(--font-family) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+/* ========== ESTILOS PARA HISTÓRICO DE ROTA ========== */
+.historico-rota-container {
+  background: var(--white);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin: var(--space-md) 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.historico-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.historico-lista {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.historico-item {
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--gray-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.historico-item:last-child {
+  border-bottom: none;
+}
+
+.historico-hora {
+  color: var(--gray);
+  font-size: var(--font-size-sm);
+}
+
+.historico-coords {
+  font-family: monospace;
+  font-size: var(--font-size-sm);
+  color: var(--secondary);
+}
+
+.historico-distancia {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Modo escuro */
+body.dark .mapa-container {
+  background: #2d2d44;
+}
+
+body.dark .historico-rota-container {
+  background: #2d2d44;
+}
+
+body.dark .historico-item {
+  border-bottom-color: #3d3d5a;
+}
+
+body.dark .historico-coords {
+  color: #e0e0e0;
 }
